@@ -1,0 +1,9 @@
+# environments
+*.env
+
+# python caches
+*.pyc
+*__pycache__/
+
+# data
+data/
