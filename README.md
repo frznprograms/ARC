@@ -74,6 +74,7 @@ https://www.kaggle.com/datasets/mrmorj/hate-speech-and-offensive-language-datase
 ```
 
 #### Jigsaw Dataet
+Please note that this dataset is **NOT** to be used for reproduction or commerical purposes. We have used it here for academic purposes in accordance with the usage policy prescribed by Jigsaw.
 ```
 @misc{jigsaw-toxic-comment-classification-challenge,
     author = {cjadams and Jeffrey Sorensen and Julia Elliott and Lucas Dixon and Mark McDonald and nithum and Will Cukierski},
