@@ -1,6 +1,6 @@
 import tempfile
 import os
-from .quality_classifier import BaseClassifier
+from .qu import BaseClassifier
 
 
 class FastTextClassifier(BaseClassifier):

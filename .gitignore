@@ -7,3 +7,6 @@
 
 # data
 data/
+src/fasttext/models_ft/
+src/fasttext/fastText
+
