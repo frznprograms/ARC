@@ -68,7 +68,18 @@ url = {https://doi.org/10.7910/DVN/ANGOX0}
 }
 ```
 
-### Twitter Toxic Comments Dataset
+#### Twitter Toxic Comments Dataset
 ```
 https://www.kaggle.com/datasets/mrmorj/hate-speech-and-offensive-language-dataset?utm_source=chatgpt.com
+```
+
+#### Jigsaw Dataet
+```
+@misc{jigsaw-toxic-comment-classification-challenge,
+    author = {cjadams and Jeffrey Sorensen and Julia Elliott and Lucas Dixon and Mark McDonald and nithum and Will Cukierski},
+    title = {Toxic Comment Classification Challenge},
+    year = {2017},
+    howpublished = {\url{https://kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge}},
+    note = {Kaggle}
+}
 ```
