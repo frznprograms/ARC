@@ -265,3 +265,6 @@ class DataLoader:
 
     def get_all(self):
         return self.splits
+    
+
+    ## spam, ad, 
