@@ -56,3 +56,4 @@ nosetests.xml
 coverage.xml
 
 data/*
+data.csv

@@ -7,11 +7,11 @@ from openai import OpenAI
 
 
 class MessageInfo(BaseModel):
-    Required_Skills: str
-    Educational_Requirements: str
-    Experience_Level: str
-    Preferred_Qualifications: str
-    Compensation_and_Benefits:str 
+    spam: str
+    advertisement: str
+    irrelevant_content: str
+    non_visitor_rant: str
+    toxicity:str 
 
 class Messages(BaseModel):
     messages: List[MessageInfo]
@@ -33,17 +33,17 @@ class BatchProcess():
         for i in range(no_of_batches):
             print(f"Processing batch {i}...")
             
-            messages, job_ids, checkpoint = self.prepare_llm_inputs(self.df, self.start_index, batch_size) #process before llm
+            messages, row_ids, checkpoint = self.prepare_llm_inputs(self.df, self.start_index, batch_size) #process before llm
             llm_structured_output = self.get_structured_output_from_llm(self.system_message, messages) #pass to llm, get responses
 
-            print("Processing job_ids...", job_ids)
+            print("Processing row_ids...", row_ids)
 
-            if len(llm_structured_output.messages) != len(job_ids):
+            if len(llm_structured_output.messages) != len(row_ids):
                 print(messages)
                 print(llm_structured_output.messages)
-                raise ValueError(f"Error: Expected batch size of {batch_size}, but got jobids: {len(job_ids)} and llmoutputs: {len(llm_structured_output.messages)}.")
+                raise ValueError(f"Error: Expected batch size of {batch_size}, but got jobids: {len(row_ids)} and llmoutputs: {len(llm_structured_output.messages)}.")
 
-            batch_jds = self.append_jb_ids(job_ids, llm_structured_output) #process output, append jd ids to the response
+            batch_jds = self.append_jb_ids(row_ids, llm_structured_output) #process output, append jd ids to the response
 
             self.write_to_file(batch_jds, checkpoint, self.batch_start_number) #write to json for the batch
             
@@ -64,8 +64,8 @@ class BatchProcess():
         job_ids = []
         counter = 1
         for i in range(checkpoint, checkpoint+batch_size):
-            job_id = int(df.iloc[i]['job_id'])
-            raw_jd = df.iloc[i]['description'].strip()
+            job_id = int(df.iloc[i]['id'])
+            raw_jd = df.iloc[i]['user_message'].strip()
             job_ids.append(job_id)
             messages += f"<Job {counter}>\n{raw_jd}\n</Job {counter}>\n\n"
             counter+=1
