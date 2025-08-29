@@ -13,6 +13,8 @@ class BaseProcessor(ABC):
     raw_dataset: pd.DataFrame = field(default_factory=pd.DataFrame)
     debug_mode: bool = False
 
+    # TODO: add some stuff for debug mode
+
     def __post_init__(self):
         if self.file_path is not None:
             # will be disabled for Toxigen dataset, loaded from HF

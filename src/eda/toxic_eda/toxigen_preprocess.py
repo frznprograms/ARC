@@ -19,6 +19,7 @@ class ToxigenProcessor(BaseProcessor):
         annotated_cleaned = self._clean_annotated_dataset()
 
         cleaned = pd.concat([gen_cleaned, annotated_cleaned], axis=0)  # type: ignore
+        cleaned.drop_duplicates(inplace=True)
 
         self.save_data(data=cleaned, path=save_path)
 
