@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from transformers import AutoTokenizer, AutoModel, Trainer, TrainingArguments
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from peft import LoraConfig, get_peft_model, TaskType
 import numpy as np
 from typing import Dict, List, Optional
 import json
@@ -11,21 +12,6 @@ from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import os
-import math
-
-
-class LoRALayer(nn.Module):
-    def __init__(self, in_features: int, out_features: int, rank: int = 16, alpha: float = 16):
-        super().__init__()
-        self.rank = rank
-        self.alpha = alpha
-        self.scaling = alpha / rank
-        
-        self.lora_A = nn.Parameter(torch.randn(rank, in_features) / math.sqrt(rank))
-        self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
-        
-    def forward(self, x):
-        return (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
 
 @dataclass
@@ -75,110 +61,44 @@ class ReviewClassificationDataset(Dataset):
 
 
 class ReviewSFTEncoder(nn.Module):
-    def __init__(self, model_name: str = "distilbert-base-uncased", dropout_rate: float = 0.3, lora_rank: int = 16, lora_alpha: float = 16):
+    def __init__(self, model_name: str = "distilbert-base-uncased", lora_rank: int = 16, lora_alpha: float = 32):
         super().__init__()
         self.model_name = model_name
-        self.backbone = AutoModel.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-        hidden_size = self.backbone.config.hidden_size
         
-        # Freeze all backbone parameters
-        for param in self.backbone.parameters():
-            param.requires_grad = False
-        
-        # Add LoRA adapters to middle transformer layers
-        self.lora_adapters = nn.ModuleDict()
-        
-        # For DistilBERT, apply LoRA to middle layers (layers 2-4 out of 6 layers)
-        target_layers = [2, 3, 4]
-        
-        for layer_idx in target_layers:
-            layer = self.backbone.transformer.layer[layer_idx]
-            
-            # Apply LoRA to query, key, value projections in attention
-            attention = layer.attention
-            q_proj = attention.q_lin
-            k_proj = attention.k_lin  
-            v_proj = attention.v_lin
-            
-            # Create LoRA adapters for Q, K, V projections
-            self.lora_adapters[f'layer_{layer_idx}_q'] = LoRALayer(
-                q_proj.in_features, q_proj.out_features, lora_rank, lora_alpha
-            )
-            self.lora_adapters[f'layer_{layer_idx}_k'] = LoRALayer(
-                k_proj.in_features, k_proj.out_features, lora_rank, lora_alpha
-            )
-            self.lora_adapters[f'layer_{layer_idx}_v'] = LoRALayer(
-                v_proj.in_features, v_proj.out_features, lora_rank, lora_alpha
-            )
-            
-            # Apply LoRA to feed-forward layers
-            ffn = layer.ffn
-            lin1 = ffn.lin1
-            lin2 = ffn.lin2
-            
-            self.lora_adapters[f'layer_{layer_idx}_ffn1'] = LoRALayer(
-                lin1.in_features, lin1.out_features, lora_rank, lora_alpha
-            )
-            self.lora_adapters[f'layer_{layer_idx}_ffn2'] = LoRALayer(
-                lin2.in_features, lin2.out_features, lora_rank, lora_alpha
-            )
-        
-        # Multi-task classification head (trainable)
-        self.classifier = nn.Sequential(
-            nn.Dropout(dropout_rate),
-            nn.Linear(hidden_size, 256),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(128, 4),  # 4 classification tasks
-            nn.Sigmoid()
+        # Load model for multi-label classification (4 labels)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, 
+            num_labels=4,
+            problem_type="multi_label_classification"
         )
+        
+        # Configure LoRA
+        lora_config = LoraConfig(
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            target_modules=["q_lin", "k_lin", "v_lin"],  # DistilBERT attention layers
+            lora_dropout=0.1,
+            bias="none",
+            task_type=TaskType.SEQ_CLS
+        )
+        
+        # Apply LoRA to the model
+        self.model = get_peft_model(self.model, lora_config)
         
         self.label_names = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
         
-    def forward(self, input_ids, attention_mask):
-        # Use the standard backbone forward pass
-        outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
-        
-        # Get hidden states from all layers
-        hidden_states = outputs.hidden_states
-        
-        # Apply LoRA adapters to middle layers
-        x = hidden_states[-1]  # Start with final layer output
-        
-        # Apply LoRA to specific middle layers (layers 2-4)
-        for i in [2, 3, 4]:
-            layer_hidden = hidden_states[i+1]  # hidden_states[0] is embeddings, so layer i is at index i+1
-            
-            # Apply LoRA to attention projections
-            q_lora = self.lora_adapters[f'layer_{i}_q'](layer_hidden)
-            k_lora = self.lora_adapters[f'layer_{i}_k'](layer_hidden)
-            v_lora = self.lora_adapters[f'layer_{i}_v'](layer_hidden)
-            
-            # Apply LoRA to FFN
-            ffn1_lora = self.lora_adapters[f'layer_{i}_ffn1'](layer_hidden)
-            ffn2_lora = self.lora_adapters[f'layer_{i}_ffn2'](ffn1_lora)
-            
-            # Add LoRA outputs to final representation
-            x = x + q_lora + k_lora + v_lora + ffn2_lora
-        
-        # Use CLS token representation
-        cls_output = x[:, 0, :]
-        logits = self.classifier(cls_output)
-        return logits
+    def forward(self, input_ids, attention_mask, labels=None):
+        return self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
     
     def predict_review_classification(self, review_prompt: str, threshold: float = 0.5) -> ReviewClassificationResult:
         """
         Predict classification for a single review prompt
         """
-        self.eval()
+        self.model.eval()
         
         encoding = self.tokenizer(
             review_prompt,
@@ -189,13 +109,13 @@ class ReviewSFTEncoder(nn.Module):
         )
         
         with torch.no_grad():
-            logits = self.forward(
-                encoding['input_ids'],
-                encoding['attention_mask']
-            ).squeeze()
+            outputs = self.model(
+                input_ids=encoding['input_ids'],
+                attention_mask=encoding['attention_mask']
+            )
+            logits = outputs.logits.squeeze()
+            probabilities = torch.sigmoid(logits).numpy()
             
-        probabilities = logits.numpy() if isinstance(logits, torch.Tensor) else logits
-        
         # Convert probabilities to binary predictions
         predictions = (probabilities > threshold).astype(int)
         
@@ -320,27 +240,15 @@ class ReviewSFTTrainer:
     def __init__(self, model: ReviewSFTEncoder, device: str = 'cpu'):
         self.model = model.to(device)
         self.device = device
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.BCEWithLogitsLoss()
         
-        # Only optimize LoRA parameters and classifier
-        trainable_params = []
+        # Print trainable parameter info
+        self.model.model.print_trainable_parameters()
         
-        # Add LoRA adapter parameters
-        for name, param in self.model.lora_adapters.named_parameters():
-            if param.requires_grad:
-                trainable_params.append(param)
-                
-        # Add classifier parameters
-        for name, param in self.model.classifier.named_parameters():
-            if param.requires_grad:
-                trainable_params.append(param)
+        # Only optimize trainable parameters (LoRA adapters)
+        trainable_params = [p for p in self.model.parameters() if p.requires_grad]
         
-        print(f"Training {len(trainable_params)} parameters (LoRA + classifier only)")
-        total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_param_count = sum(p.numel() for p in trainable_params)
-        print(f"Trainable parameters: {trainable_param_count:,} / {total_params:,} ({100 * trainable_param_count / total_params:.2f}%)")
-        
-        self.optimizer = optim.AdamW(trainable_params, lr=1e-3, weight_decay=0.01)
+        self.optimizer = optim.AdamW(trainable_params, lr=1e-4, weight_decay=0.01)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, mode='min', patience=3, factor=0.5
         )
@@ -356,8 +264,8 @@ class ReviewSFTTrainer:
             
             self.optimizer.zero_grad()
             
-            outputs = self.model(input_ids, attention_mask)
-            loss = self.criterion(outputs, labels)
+            outputs = self.model(input_ids, attention_mask, labels=labels)
+            loss = outputs.loss
             
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
@@ -379,11 +287,12 @@ class ReviewSFTTrainer:
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['labels'].to(self.device)
                 
-                outputs = self.model(input_ids, attention_mask)
-                loss = self.criterion(outputs, labels)
+                outputs = self.model(input_ids, attention_mask, labels=labels)
+                loss = outputs.loss
                 total_loss += loss.item()
                 
-                predictions = (outputs > 0.5).float()
+                logits = outputs.logits
+                predictions = (torch.sigmoid(logits) > 0.5).float()
                 all_predictions.append(predictions.cpu().numpy())
                 all_labels.append(labels.cpu().numpy())
         
