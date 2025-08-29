@@ -11,6 +11,9 @@ from src.eda.toxic_eda.base_preprocess import BaseProcessor
 @dataclass
 class ToxigenProcessor(BaseProcessor):
 
+    def __post_init__(self):
+        self.read_hf_data()
+
     def preprocess(self, save_path: Union[str, Path]):
         logger.info("Starting preprocessing...")
 
@@ -26,6 +29,7 @@ class ToxigenProcessor(BaseProcessor):
         logger.success("Preprocessed Toxigen dataset successfully.")
 
     def read_hf_data(self) -> None:
+        logger.info("Loading dataset from HuggingFace...")
         gen_data = load_dataset("toxigen/toxigen-data", name="train")[
             "train"
         ].to_pandas()  # type: ignore
@@ -34,6 +38,7 @@ class ToxigenProcessor(BaseProcessor):
         ].to_pandas()  # type: ignore
 
         self.gen_data, self.annotated_data = gen_data, annotated_data
+        logger.success("Successfully loaded dataset from HuggingFace.")
 
     def _compile_dataset(self):
         prompts, generations, labels = (
@@ -42,7 +47,7 @@ class ToxigenProcessor(BaseProcessor):
             self.gen_data["prompt_label"],  # type: ignore
         )
         new_entries, new_labels = [], []
-        n = len(self.raw_dataset)
+        n = len(self.gen_data)  # type: ignore
         for i in range(n):
             full_prompt, generation, label = (
                 prompts.iloc[i],
@@ -61,6 +66,8 @@ class ToxigenProcessor(BaseProcessor):
 
     def _clean_compiled_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
         # Remove leading dash and surrounding whitespace
+        df.dropna(inplace=True)
+        df["text"] = df["text"].astype(str)
         df["text"] = df["text"].str.lstrip("-").str.strip()
         # Keep only rows where text contains at least one alphabet (A–Z or a–z)
         df = df[df["text"].str.contains(r"[A-Za-z]", na=False)]  # type: ignore
@@ -81,3 +88,8 @@ class ToxigenProcessor(BaseProcessor):
         safe_annotated_data["unsafe_label"] = 0
 
         self.annotated_data = safe_annotated_data
+
+
+if __name__ == "__main__":
+    tp = ToxigenProcessor(file_path=None)
+    tp.preprocess(save_path="data/cleaned/trial/toxigen_clean.csv")

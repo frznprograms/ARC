@@ -26,7 +26,7 @@ class BaseProcessor(ABC):
 
     @logger.catch(message="Unable to read dataset.", reraise=True)
     def read_data(self, path: Union[str, Path], **kwargs) -> pd.DataFrame:
-        data = pd.read_csv(path, kwargs)  # type: ignore
+        data = pd.read_csv(path, **kwargs)  # type: ignore
         return data
 
     @logger.catch(

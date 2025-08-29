@@ -35,3 +35,8 @@ class JigsawProcessor(BaseProcessor):
         ]
         df["unsafe_label"] = df[label_cols].any(axis=1).astype(int)  # type: ignore
         logger.success("Added the appropriate safe/unsafe binary label to dataset.")
+
+
+if __name__ == "__main__":
+    jp = JigsawProcessor(file_path="data/raw/toxicity/jigsaw.csv")
+    jp.preprocess(save_path="data/cleaned/trial/jigsaw_clean.csv")

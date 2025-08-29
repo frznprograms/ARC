@@ -43,3 +43,8 @@ class TwitterProcessor(BaseProcessor):
         text = re.sub(r"\s+", " ", text).strip()
 
         return text
+
+
+if __name__ == "__main__":
+    twp = TwitterProcessor(file_path="data/raw/toxicity/twitter.csv")
+    twp.preprocess(save_path="data/cleaned/trial/twitter_clean.csv")

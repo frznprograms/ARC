@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from src.utils.helpers import timed_execution
+from src.utils.base_helpers import timed_execution
 from src.utils.toxic_lexicon import toxic_lexicon
 
 
@@ -27,6 +27,7 @@ class LexiconFeatureExtractor(BaseEstimator, TransformerMixin):
         ]
 
 
+@dataclass
 class SafetyPipeline:
     pipeline: Pipeline
     data: pd.DataFrame = field(default_factory=pd.DataFrame)
