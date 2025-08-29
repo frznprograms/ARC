@@ -11,6 +11,21 @@ from dataclasses import dataclass
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import os
+import math
+
+
+class LoRALayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int, rank: int = 16, alpha: float = 16):
+        super().__init__()
+        self.rank = rank
+        self.alpha = alpha
+        self.scaling = alpha / rank
+        
+        self.lora_A = nn.Parameter(torch.randn(rank, in_features) / math.sqrt(rank))
+        self.lora_B = nn.Parameter(torch.zeros(out_features, rank))
+        
+    def forward(self, x):
+        return (x @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
 
 @dataclass
@@ -60,7 +75,7 @@ class ReviewClassificationDataset(Dataset):
 
 
 class ReviewSFTEncoder(nn.Module):
-    def __init__(self, model_name: str = "distilbert-base-uncased", dropout_rate: float = 0.3):
+    def __init__(self, model_name: str = "distilbert-base-uncased", dropout_rate: float = 0.3, lora_rank: int = 16, lora_alpha: float = 16):
         super().__init__()
         self.model_name = model_name
         self.backbone = AutoModel.from_pretrained(model_name)
@@ -71,7 +86,49 @@ class ReviewSFTEncoder(nn.Module):
             
         hidden_size = self.backbone.config.hidden_size
         
-        # Multi-task classification head
+        # Freeze all backbone parameters
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        
+        # Add LoRA adapters to middle transformer layers
+        self.lora_adapters = nn.ModuleDict()
+        
+        # For DistilBERT, apply LoRA to middle layers (layers 2-4 out of 6 layers)
+        target_layers = [2, 3, 4]
+        
+        for layer_idx in target_layers:
+            layer = self.backbone.transformer.layer[layer_idx]
+            
+            # Apply LoRA to query, key, value projections in attention
+            attention = layer.attention
+            q_proj = attention.q_lin
+            k_proj = attention.k_lin  
+            v_proj = attention.v_lin
+            
+            # Create LoRA adapters for Q, K, V projections
+            self.lora_adapters[f'layer_{layer_idx}_q'] = LoRALayer(
+                q_proj.in_features, q_proj.out_features, lora_rank, lora_alpha
+            )
+            self.lora_adapters[f'layer_{layer_idx}_k'] = LoRALayer(
+                k_proj.in_features, k_proj.out_features, lora_rank, lora_alpha
+            )
+            self.lora_adapters[f'layer_{layer_idx}_v'] = LoRALayer(
+                v_proj.in_features, v_proj.out_features, lora_rank, lora_alpha
+            )
+            
+            # Apply LoRA to feed-forward layers
+            ffn = layer.ffn
+            lin1 = ffn.lin1
+            lin2 = ffn.lin2
+            
+            self.lora_adapters[f'layer_{layer_idx}_ffn1'] = LoRALayer(
+                lin1.in_features, lin1.out_features, lora_rank, lora_alpha
+            )
+            self.lora_adapters[f'layer_{layer_idx}_ffn2'] = LoRALayer(
+                lin2.in_features, lin2.out_features, lora_rank, lora_alpha
+            )
+        
+        # Multi-task classification head (trainable)
         self.classifier = nn.Sequential(
             nn.Dropout(dropout_rate),
             nn.Linear(hidden_size, 256),
@@ -80,16 +137,40 @@ class ReviewSFTEncoder(nn.Module):
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
-            nn.Linear(128, 4),  # 5 classification tasks
+            nn.Linear(128, 4),  # 4 classification tasks
             nn.Sigmoid()
         )
         
         self.label_names = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
         
     def forward(self, input_ids, attention_mask):
-        outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+        # Use the standard backbone forward pass
+        outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+        
+        # Get hidden states from all layers
+        hidden_states = outputs.hidden_states
+        
+        # Apply LoRA adapters to middle layers
+        x = hidden_states[-1]  # Start with final layer output
+        
+        # Apply LoRA to specific middle layers (layers 2-4)
+        for i in [2, 3, 4]:
+            layer_hidden = hidden_states[i+1]  # hidden_states[0] is embeddings, so layer i is at index i+1
+            
+            # Apply LoRA to attention projections
+            q_lora = self.lora_adapters[f'layer_{i}_q'](layer_hidden)
+            k_lora = self.lora_adapters[f'layer_{i}_k'](layer_hidden)
+            v_lora = self.lora_adapters[f'layer_{i}_v'](layer_hidden)
+            
+            # Apply LoRA to FFN
+            ffn1_lora = self.lora_adapters[f'layer_{i}_ffn1'](layer_hidden)
+            ffn2_lora = self.lora_adapters[f'layer_{i}_ffn2'](ffn1_lora)
+            
+            # Add LoRA outputs to final representation
+            x = x + q_lora + k_lora + v_lora + ffn2_lora
+        
         # Use CLS token representation
-        cls_output = outputs.last_hidden_state[:, 0, :]
+        cls_output = x[:, 0, :]
         logits = self.classifier(cls_output)
         return logits
     
@@ -181,11 +262,27 @@ class ReviewDataProcessor:
                     
         return prompts, labels
     
-    def load_raw_data_from_csv(self, csv_path: str) -> pd.DataFrame:
+    def load_labeled_data_from_csv(self, csv_path: str) -> tuple[List[str], List[Dict]]:
         """
-        Load the raw review data from CSV
+        Load labeled training data directly from CSV
         """
-        return pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path)
+        prompts = []
+        labels = []
+        
+        for _, row in df.iterrows():
+            prompts.append(row['text'])
+            
+            # Map CSV columns to our label format
+            label_dict = {
+                'advertisement': int(row.get('advertisement', 0)),
+                'irrelevant_content': 1 - int(row.get('relevance', 1)),  # relevance=0 means irrelevant=1
+                'non_visitor_rant': int(row.get('rant', 0)),
+                'toxicity': int(row.get('toxicity', 0))
+            }
+            labels.append(label_dict)
+            
+        return prompts, labels
     
     def create_prompt_response_pairs(self, df: pd.DataFrame, labeled_data: List[Dict]) -> tuple[List[str], List[str]]:
         """
@@ -217,36 +314,6 @@ class ReviewDataProcessor:
                 
         return prompts, responses
     
-    def create_sample_training_data(self, num_samples: int = 100) -> tuple[List[str], List[Dict]]:
-        """
-        Create sample training data for testing
-        """
-        sample_prompts = [
-            "Business Name: Pizza Palace\nCategory: Restaurant\nDescription: Italian restaurant\nReview: This place has the best pizza in town! Highly recommend to everyone!\nResponse: None",
-            "Business Name: Coffee Shop\nCategory: Cafe\nDescription: Local coffee shop\nReview: Terrible service, the staff are complete idiots and the coffee tastes like garbage!\nResponse: None",
-            "Business Name: Hotel Downtown\nCategory: Hotel\nDescription: Business hotel\nReview: I heard from my friend that this hotel is overpriced and dirty. Never staying there!\nResponse: None",
-            "Business Name: Auto Repair\nCategory: Car Service\nDescription: Auto repair shop\nReview: Great car service! By the way, check out my friend's restaurant Tony's Pizza - they have amazing deals!\nResponse: None",
-            "Business Name: Shopping Mall\nCategory: Shopping\nDescription: Local mall\nReview: The weather today is really nice. Had a great day with my family at the park.\nResponse: None"
-        ]
-        
-        sample_labels = [
-            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 0},
-            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 1},
-            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 1, 'toxicity': 0},
-            {'advertisement': 1, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0},
-            {'advertisement': 0, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0}
-        ]
-        
-        # Repeat samples to reach desired number
-        prompts = []
-        labels = []
-        
-        for i in range(num_samples):
-            idx = i % len(sample_prompts)
-            prompts.append(sample_prompts[idx])
-            labels.append(sample_labels[idx])
-            
-        return prompts, labels
 
 
 class ReviewSFTTrainer:
@@ -254,7 +321,26 @@ class ReviewSFTTrainer:
         self.model = model.to(device)
         self.device = device
         self.criterion = nn.BCELoss()
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=2e-5, weight_decay=0.01)
+        
+        # Only optimize LoRA parameters and classifier
+        trainable_params = []
+        
+        # Add LoRA adapter parameters
+        for name, param in self.model.lora_adapters.named_parameters():
+            if param.requires_grad:
+                trainable_params.append(param)
+                
+        # Add classifier parameters
+        for name, param in self.model.classifier.named_parameters():
+            if param.requires_grad:
+                trainable_params.append(param)
+        
+        print(f"Training {len(trainable_params)} parameters (LoRA + classifier only)")
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_param_count = sum(p.numel() for p in trainable_params)
+        print(f"Trainable parameters: {trainable_param_count:,} / {total_params:,} ({100 * trainable_param_count / total_params:.2f}%)")
+        
+        self.optimizer = optim.AdamW(trainable_params, lr=1e-3, weight_decay=0.01)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, mode='min', patience=3, factor=0.5
         )
@@ -376,7 +462,7 @@ class ReviewSFTTrainer:
 
 def main():
     """
-    Main function to SFT decoder training
+    Main function for SFT encoder training
     """
     # Initialize components
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -386,14 +472,18 @@ def main():
     processor = ReviewDataProcessor()
     trainer = ReviewSFTTrainer(model, device)
     
-    # Create sample training data
-    print("Creating sample training data...")
-    prompts, labels = processor.create_sample_training_data(num_samples=200)
+    # Load labeled training data from CSV
+    print("Loading training data...")
+    prompts, labels = processor.load_labeled_data_from_csv("final_hf_ds.csv")
+    print(f"Loaded {len(prompts)} labeled samples from CSV")
     
-    # Split data
+    # Split data into train/validation sets
     train_prompts, val_prompts, train_labels, val_labels = train_test_split(
         prompts, labels, test_size=0.2, random_state=42
     )
+    
+    print(f"Training samples: {len(train_prompts)}")
+    print(f"Validation samples: {len(val_prompts)}")
     
     # Create datasets
     train_dataset = ReviewClassificationDataset(train_prompts, train_labels, model.tokenizer)
@@ -404,14 +494,15 @@ def main():
     val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
     
     # Train model
+    print("\nStarting training...")
     results = trainer.train_model(
         train_dataloader, 
         val_dataloader, 
-        num_epochs=5,
-        save_path="review_sft_decoder.pth"
+        num_epochs=10,
+        save_path="review_sft_encoder_lora.pth"
     )
     
-    # Test inference
+    # Test inference with a sample
     print("\nTesting inference...")
     test_prompt = "Business Name: Test Restaurant\nCategory: Restaurant\nReview: This place is absolutely terrible! The staff are idiots!\nResponse: None"
     
