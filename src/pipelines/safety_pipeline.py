@@ -81,8 +81,12 @@ class SafetyPipeline:
     def eval_pipeline(self):
         logger.info("Now evaluating, please do not interrupt...")
         y_pred = self.pipeline.predict(self.X_test)
-        print(classification_report(self.y_test, y_pred))
-        print(f"Accuracy: {accuracy_score(self.y_test, y_pred)}")
+        report = classification_report(self.y_test, y_pred)
+        accuracy = accuracy_score(self.y_test, y_pred)
+
+        print(report)
+        print(f"Accuracy: {accuracy:.4f}")
+        return report, accuracy
 
     @logger.catch(message="Unable to prepare train-test split.")
     def prepare_data(self, test_size: float = 0.25):
