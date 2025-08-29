@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Union
 from pathlib import Path
 
-from eda.toxic_eda.base_preprocess import BaseProcessor
+from src.eda.toxic_eda.base_preprocess import BaseProcessor
 
 
 @dataclass

@@ -10,5 +10,6 @@ dependencies = [
     "loguru>=0.7.3",
     "pandas>=2.3.2",
     "scikit-learn>=1.7.1",
+    "torch>=2.8.0",
     "transformers>=4.55.4",
 ]

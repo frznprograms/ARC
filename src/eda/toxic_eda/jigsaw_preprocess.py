@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from eda.toxic_eda.base_preprocess import BaseProcessor
+from src.eda.toxic_eda.base_preprocess import BaseProcessor
 from loguru import logger
 from typing import Union
 from pathlib import Path

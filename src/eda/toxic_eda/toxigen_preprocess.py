@@ -5,7 +5,7 @@ from typing import Union
 from loguru import logger
 from pathlib import Path
 
-from eda.toxic_eda.base_preprocess import BaseProcessor
+from src.eda.toxic_eda.base_preprocess import BaseProcessor
 
 
 @dataclass
