@@ -1,17 +1,17 @@
+from pathlib import Path
+import joblib
 from dataclasses import dataclass, field
 import pandas as pd
-from typing import Optional
 from loguru import logger
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from src.utils.base_helpers import timed_execution, prepare_safety_datasets
+from src.utils.base_helpers import timed_execution
 from src.utils.toxic_lexicon import toxic_lexicon
-from src.utils.config_helpers import load_config
 
 
 class LexiconFeatureExtractor(BaseEstimator, TransformerMixin):
@@ -35,46 +35,51 @@ class SafetyPipeline:
     data_prepared: bool = False
     seed: int = 42
 
-    def create_pipeline(self, config: dict):
-        tfidf_cfg = config["safety_pipeline"]["tfidf"]
-        clf_cfg = config["safety_pipeline"]["clf"]
-        lexicon_enabled = config["safety_pipeline"]["lexicon"]["enabled"]
-
-        if "ngram_range" in tfidf_cfg and isinstance(tfidf_cfg["ngram_range"], list):
-            tfidf_cfg["ngram_range"] = tuple(tfidf_cfg["ngram_range"])
-
-        tfidf = TfidfVectorizer(**tfidf_cfg)
-
-        features = []
-        features.append(("tfidf", tfidf))
-        if lexicon_enabled:
-            features.append(("lexicon", LexiconFeatureExtractor(toxic_lexicon)))
-
-        clf = LogisticRegression(**clf_cfg)
-
+    def create_pipeline(self):
+        tfidf = TfidfVectorizer()
+        features = FeatureUnion(
+            [
+                ("tfidf", tfidf),
+                ("lexicon", LexiconFeatureExtractor(toxic_lexicon)),
+            ]
+        )
         self.pipeline = Pipeline(
             [
-                ("features", FeatureUnion(features)),
-                ("clf", clf),
+                ("features", features),
+                ("clf", LogisticRegression(random_state=self.seed)),
             ]
         )
 
     @timed_execution
     @logger.catch(message="Unable to finish training pipeline.", reraise=True)
-    def train_pipeline(self, test_size: float = 0.25, config: Optional[dict] = None):
+    def train_pipeline(
+        self,
+        param_grid: dict,
+        save_name: str = "experiment_default.csv",
+        cv: int = 3,
+        test_size: float = 0.25,
+    ):
         if not self.data_prepared:
             self.prepare_data(test_size=test_size)
 
-        if not hasattr(self, "pipeline"):
-            if config is None:
-                logger.error(
-                    "Pipeline not created. Call create_pipeline() and pass a config."
-                )
-            self.create_pipeline(config=config)  # type: ignore
-
         logger.info("Now training, please do not interrupt...")
-        self.pipeline.fit(self.X_train, self.y_train)
-        logger.success("Finished training pipeline.")
+        search = GridSearchCV(
+            estimator=self.pipeline,
+            param_grid=param_grid,
+            cv=cv,
+            scoring="recall",
+            n_jobs=-1,
+        )
+        search.fit(self.X_train, self.y_train)
+        self.pipeline = search.best_estimator_
+
+        save_path = Path("models")  # type: ignore
+        save_path.mkdir(parents=True, exist_ok=True)  # type:ignore
+        model_save_path = save_path / save_name
+        joblib.dump(self.pipeline, model_save_path)
+
+        logger.success(f"Best params: {search.best_params_}")
+        return search
 
     @timed_execution
     @logger.catch(message="Unable to finish evaluating pipeline.", reraise=True)
@@ -92,23 +97,31 @@ class SafetyPipeline:
     def prepare_data(self, test_size: float = 0.25):
         X, y = self.data["text"], self.data["unsafe_label"]
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.seed
+            X, y, test_size=test_size, random_state=self.seed, stratify=y
         )
         self.data_prepared = True
 
 
 if __name__ == "__main__":
-    combined_data = prepare_safety_datasets(
-        jigsaw_path="data/raw/toxicity/jigsaw.csv",
-        jigsaw_save_path="data/cleaned/trial/jigsaw_clean.csv",
-        toxigen_save_path="data/cleaned/trial/toxiegn_clean.csv",
-        twitter_path="data/raw/toxicity/twitter.csv",
-        twitter_save_path="data/cleaned/trial/twitter.csv",
-    )
-    # print(combined_data.head())
+    # combined_data = prepare_safety_datasets(
+    #     jigsaw_path="data/raw/toxicity/jigsaw.csv",
+    #     jigsaw_save_path="data/cleaned/trial/jigsaw_clean.csv",
+    #     toxigen_save_path="data/cleaned/trial/toxiegn_clean.csv",
+    #     twitter_path="data/raw/toxicity/twitter.csv",
+    #     twitter_save_path="data/cleaned/trial/twitter.csv",
+    # )
+    # combined_data.to_csv("data/for_model/combined_safety_data.csv", index=False)
 
+    param_grid = {
+        "features__tfidf__min_df": [5, 10],
+        "features__tfidf__max_features": [50000, 75000],
+        "features__tfidf__ngram_range": [(1, 1), (1, 2)],
+        "clf__max_iter": [1000, 2000],
+        "clf__class_weight": ["balanced"],
+    }
+    combined_data = pd.read_csv("data/for_model/combined_safety_data.csv")
+    combined_data.dropna(inplace=True)
     sp = SafetyPipeline(data=combined_data)
-    test_config = load_config(path="src/configs/safety_config.yaml")
-    sp.create_pipeline(config=test_config)
-    sp.train_pipeline()
+    sp.create_pipeline()
+    sp.train_pipeline(param_grid=param_grid, save_name="safety-model-test")
     sp.eval_pipeline()

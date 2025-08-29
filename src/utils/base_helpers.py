@@ -23,6 +23,8 @@ def prepare_safety_datasets(
     twitter = TwitterProcessor(file_path=twitter_path).preprocess(twitter_save_path)
 
     combined_df = pd.concat([jigsaw, toxigen, twitter], axis=0)  # type: ignore
+    combined_df.dropna(inplace=True)
+    combined_df.drop_duplicates(inplace=True)
 
     return combined_df
 
