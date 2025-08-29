@@ -21,7 +21,7 @@ class BaseProcessor(ABC):
             self.raw_dataset = self.read_data(self.file_path)
 
     @abstractmethod
-    def preprocess(self, save_path: Union[str, Path]):
+    def preprocess(self, save_path: Union[str, Path]) -> pd.DataFrame:
         pass
 
     @logger.catch(message="Unable to read dataset.", reraise=True)

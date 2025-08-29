@@ -14,7 +14,7 @@ class ToxigenProcessor(BaseProcessor):
     def __post_init__(self):
         self.read_hf_data()
 
-    def preprocess(self, save_path: Union[str, Path]):
+    def preprocess(self, save_path: Union[str, Path]) -> pd.DataFrame:
         logger.info("Starting preprocessing...")
 
         gen_intermediate = self._compile_dataset()
@@ -27,6 +27,7 @@ class ToxigenProcessor(BaseProcessor):
         self.save_data(data=cleaned, path=save_path)
 
         logger.success("Preprocessed Toxigen dataset successfully.")
+        return cleaned
 
     def read_hf_data(self) -> None:
         logger.info("Loading dataset from HuggingFace...")

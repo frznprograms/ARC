@@ -10,7 +10,7 @@ from src.eda.toxic_eda.base_preprocess import BaseProcessor
 
 @dataclass
 class TwitterProcessor(BaseProcessor):
-    def preprocess(self, save_path: Union[str, Path]):
+    def preprocess(self, save_path: Union[str, Path]) -> pd.DataFrame:
         logger.info("Starting preprocessing...")
 
         clean_data = pd.DataFrame()
@@ -22,6 +22,7 @@ class TwitterProcessor(BaseProcessor):
 
         self.save_data(data=clean_data, path=save_path)  # type: ignore
         logger.success("Preprocessed Twitter dataset successfully.")
+        return clean_data  # type: ignore
 
     def _clean_tweet(self, text: str) -> str:
         if not isinstance(text, str):

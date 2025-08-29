@@ -13,7 +13,7 @@ class JigsawProcessor(BaseProcessor):
 
     # since each dataset has its own unique columns and properties,
     # it is likely more efficient to handle each dataset separately
-    def preprocess(self, save_path: Union[str, Path]):
+    def preprocess(self, save_path: Union[str, Path]) -> pd.DataFrame:
         logger.info("Starting preprocessing...")
         self._add_unsafe_label(self.raw_dataset)
 
@@ -23,6 +23,7 @@ class JigsawProcessor(BaseProcessor):
 
         self.save_data(data=cleaned_dataset, path=save_path)  # type: ignore
         logger.success("Preprocessed Jigsaw dataset successfully.")
+        return cleaned_dataset  # type: ignore
 
     def _add_unsafe_label(self, df: pd.DataFrame) -> None:
         label_cols = [
