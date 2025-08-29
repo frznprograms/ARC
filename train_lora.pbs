@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -P 71001002
+#PBS -q ic102
+#PBS -N sft_lora_train
+#PBS -l select=1:ncpus=8:mem=32gb:ngpus=1
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o train_lora.log
+
+# Change to working directory
+cd $PBS_O_WORKDIR
+
+# Load CUDA module
+module load cuda/12.2.2
+
+# Install PEFT if not available
+pip install --user peft
+
+# Run training
+python sft_encoder.py

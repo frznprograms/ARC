@@ -99,6 +99,7 @@ class ReviewSFTEncoder(nn.Module):
         Predict classification for a single review prompt
         """
         self.model.eval()
+        device = next(self.model.parameters()).device
         
         encoding = self.tokenizer(
             review_prompt,
@@ -110,11 +111,11 @@ class ReviewSFTEncoder(nn.Module):
         
         with torch.no_grad():
             outputs = self.model(
-                input_ids=encoding['input_ids'],
-                attention_mask=encoding['attention_mask']
+                input_ids=encoding['input_ids'].to(device),
+                attention_mask=encoding['attention_mask'].to(device)
             )
             logits = outputs.logits.squeeze()
-            probabilities = torch.sigmoid(logits).numpy()
+            probabilities = torch.sigmoid(logits).cpu().numpy()
             
         # Convert probabilities to binary predictions
         predictions = (probabilities > threshold).astype(int)
@@ -149,7 +150,7 @@ class ReviewSFTEncoder(nn.Module):
 
 class ReviewDataProcessor:
     def __init__(self):
-        self.label_names = ['spam', 'advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
+        self.label_names = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
     
     def load_training_data_from_json(self, json_dir: str) -> tuple[List[str], List[Dict]]:
         """
@@ -166,8 +167,6 @@ class ReviewDataProcessor:
                     batch_data = json.load(f)
                     
                 for item in batch_data:
-                    # Extract the prompt (this would need to be reconstructed from job_id)
-                    # For now, we'll assume the prompt is stored or can be retrieved
                     job_id = item['job_id']
                     
                     # Convert string labels to integers
@@ -359,8 +358,13 @@ class ReviewSFTTrainer:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 if save_path:
+                    # Save LoRA adapters
+                    adapter_path = save_path.replace('.pth', '')
+                    self.model.model.save_pretrained(adapter_path)
+                    # Save full model state (including trained classifier)
                     torch.save(self.model.state_dict(), save_path)
-                    print(f"Best model saved to {save_path}")
+                    print(f"Best LoRA adapter saved to {adapter_path}")
+                    print(f"Full model state saved to {save_path}")
         
         return {
             'train_losses': train_losses,
@@ -378,6 +382,7 @@ def main():
     print(f"Using device: {device}")
     
     model = ReviewSFTEncoder()
+    model = model.to(device)
     processor = ReviewDataProcessor()
     trainer = ReviewSFTTrainer(model, device)
     
