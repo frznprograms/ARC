@@ -15,7 +15,6 @@ import os
 
 @dataclass
 class ReviewClassificationResult:
-    spam: int
     advertisement: int
     irrelevant_content: int
     non_visitor_rant: int
@@ -47,7 +46,6 @@ class ReviewClassificationDataset(Dataset):
         
         # Convert labels to tensor
         label_tensor = torch.tensor([
-            int(label_dict.get('spam', 0)),
             int(label_dict.get('advertisement', 0)),
             int(label_dict.get('irrelevant_content', 0)),
             int(label_dict.get('non_visitor_rant', 0)),
@@ -61,7 +59,7 @@ class ReviewClassificationDataset(Dataset):
         }
 
 
-class ReviewSFTDecoder(nn.Module):
+class ReviewSFTEncoder(nn.Module):
     def __init__(self, model_name: str = "distilbert-base-uncased", dropout_rate: float = 0.3):
         super().__init__()
         self.model_name = model_name
@@ -82,11 +80,11 @@ class ReviewSFTDecoder(nn.Module):
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
-            nn.Linear(128, 5),  # 5 classification tasks
+            nn.Linear(128, 4),  # 5 classification tasks
             nn.Sigmoid()
         )
         
-        self.label_names = ['spam', 'advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
+        self.label_names = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
         
     def forward(self, input_ids, attention_mask):
         outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
@@ -125,11 +123,10 @@ class ReviewSFTDecoder(nn.Module):
         }
         
         return ReviewClassificationResult(
-            spam=int(predictions[0]),
-            advertisement=int(predictions[1]),
-            irrelevant_content=int(predictions[2]),
-            non_visitor_rant=int(predictions[3]),
-            toxicity=int(predictions[4]),
+            advertisement=int(predictions[0]),
+            irrelevant_content=int(predictions[1]),
+            non_visitor_rant=int(predictions[2]),
+            toxicity=int(predictions[3]),
             confidence_scores=confidence_scores
         )
     
@@ -140,7 +137,6 @@ class ReviewSFTDecoder(nn.Module):
         result = self.predict_review_classification(review_prompt, threshold)
         
         response_dict = {
-            "spam": result.spam,
             "advertisement": result.advertisement,
             "irrelevant_content": result.irrelevant_content,
             "non_visitor_rant": result.non_visitor_rant,
@@ -234,11 +230,11 @@ class ReviewDataProcessor:
         ]
         
         sample_labels = [
-            {'spam': 0, 'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 0},
-            {'spam': 0, 'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 1},
-            {'spam': 0, 'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 1, 'toxicity': 0},
-            {'spam': 0, 'advertisement': 1, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0},
-            {'spam': 0, 'advertisement': 0, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0}
+            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 0},
+            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 0, 'toxicity': 1},
+            {'advertisement': 0, 'irrelevant_content': 0, 'non_visitor_rant': 1, 'toxicity': 0},
+            {'advertisement': 1, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0},
+            {'advertisement': 0, 'irrelevant_content': 1, 'non_visitor_rant': 0, 'toxicity': 0}
         ]
         
         # Repeat samples to reach desired number
@@ -254,13 +250,13 @@ class ReviewDataProcessor:
 
 
 class ReviewSFTTrainer:
-    def __init__(self, model: ReviewSFTDecoder, device: str = 'cpu'):
+    def __init__(self, model: ReviewSFTEncoder, device: str = 'cpu'):
         self.model = model.to(device)
         self.device = device
         self.criterion = nn.BCELoss()
         self.optimizer = optim.AdamW(self.model.parameters(), lr=2e-5, weight_decay=0.01)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', patience=3, factor=0.5, verbose=True
+            self.optimizer, mode='min', patience=3, factor=0.5
         )
     
     def train_epoch(self, dataloader: DataLoader) -> float:
@@ -309,7 +305,7 @@ class ReviewSFTTrainer:
         all_labels = np.vstack(all_labels)
         
         metrics = {}
-        categories = ['spam', 'advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
+        categories = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
         
         for i, category in enumerate(categories):
             if all_labels[:, i].sum() > 0:
@@ -337,7 +333,7 @@ class ReviewSFTTrainer:
         val_losses = []
         best_val_loss = float('inf')
         
-        print("Starting SFT Decoder training...")
+        print("Starting SFT Encoder training...")
         
         for epoch in range(num_epochs):
             print(f"\nEpoch {epoch+1}/{num_epochs}")
@@ -356,7 +352,7 @@ class ReviewSFTTrainer:
             print(f"Overall Accuracy: {val_metrics['overall_accuracy']:.4f}")
             
             # Print F1 scores for each category
-            categories = ['spam', 'advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
+            categories = ['advertisement', 'irrelevant_content', 'non_visitor_rant', 'toxicity']
             for cat in categories:
                 f1_key = f'{cat}_f1'
                 if f1_key in val_metrics:
@@ -380,13 +376,13 @@ class ReviewSFTTrainer:
 
 def main():
     """
-    Main function to demonstrate SFT decoder training
+    Main function to SFT decoder training
     """
     # Initialize components
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
-    model = ReviewSFTDecoder()
+    model = ReviewSFTEncoder()
     processor = ReviewDataProcessor()
     trainer = ReviewSFTTrainer(model, device)
     
