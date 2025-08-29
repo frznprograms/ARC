@@ -14,13 +14,12 @@ from src.eda.toxic_eda.twitter_preprocess import TwitterProcessor
 def prepare_safety_datasets(
     jigsaw_path: str,
     jigsaw_save_path: str,
-    toxigen_path: str,
     toxigen_save_path: str,
     twitter_path: str,
     twitter_save_path: str,
 ) -> pd.DataFrame:
     jigsaw = JigsawProcessor(file_path=jigsaw_path).preprocess(jigsaw_save_path)
-    toxigen = ToxigenProcessor(file_path=toxigen_path).preprocess(toxigen_save_path)
+    toxigen = ToxigenProcessor(file_path=None).preprocess(toxigen_save_path)
     twitter = TwitterProcessor(file_path=twitter_path).preprocess(twitter_save_path)
 
     combined_df = pd.concat([jigsaw, toxigen, twitter], axis=0)  # type: ignore
