@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import joblib
 from dataclasses import dataclass, field
 import pandas as pd
@@ -10,7 +11,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from src.utils.base_helpers import timed_execution
+from src.utils.base_helpers import read_json_safety_config, timed_execution
 from src.utils.toxic_lexicon import toxic_lexicon
 
 
@@ -72,11 +73,14 @@ class SafetyPipeline:
         )
         search.fit(self.X_train, self.y_train)
         self.pipeline = search.best_estimator_
+        best_params = search.best_params_
 
         save_path = Path("models")  # type: ignore
         save_path.mkdir(parents=True, exist_ok=True)  # type:ignore
         model_save_path = save_path / save_name
         joblib.dump(self.pipeline, model_save_path)
+        with open(f"models/best-params-{save_name}.json", "w") as f:
+            json.dump(best_params, f, indent=4)
 
         logger.success(f"Best params: {search.best_params_}")
         return search
@@ -111,17 +115,15 @@ if __name__ == "__main__":
     #     twitter_save_path="data/cleaned/trial/twitter.csv",
     # )
     # combined_data.to_csv("data/for_model/combined_safety_data.csv", index=False)
+    #
 
-    param_grid = {
-        "features__tfidf__min_df": [5, 10],
-        "features__tfidf__max_features": [50000, 75000],
-        "features__tfidf__ngram_range": [(1, 1), (1, 2)],
-        "clf__max_iter": [1000, 2000],
-        "clf__class_weight": ["balanced"],
-    }
+    param_grid = read_json_safety_config(
+        json_config_path="src/configs/safety_config.json"
+    )
+
     combined_data = pd.read_csv("data/for_model/combined_safety_data.csv")
     combined_data.dropna(inplace=True)
     sp = SafetyPipeline(data=combined_data)
     sp.create_pipeline()
-    sp.train_pipeline(param_grid=param_grid, save_name="safety-model-test")
+    sp.train_pipeline(param_grid=param_grid, save_name="safety-model-test.pkl")
     sp.eval_pipeline()

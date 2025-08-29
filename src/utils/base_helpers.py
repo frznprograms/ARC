@@ -1,6 +1,7 @@
 import time
+import json
 import torch
-from typing import Optional
+from typing import Any, Optional
 import random
 from loguru import logger
 
@@ -11,6 +12,7 @@ from src.eda.toxic_eda.toxigen_preprocess import ToxigenProcessor
 from src.eda.toxic_eda.twitter_preprocess import TwitterProcessor
 
 
+@logger.catch(message="Unable to prepare the safety-related datasets.", reraise=True)
 def prepare_safety_datasets(
     jigsaw_path: str,
     jigsaw_save_path: str,
@@ -29,6 +31,32 @@ def prepare_safety_datasets(
     return combined_df
 
 
+@logger.catch(message="Unable to read json configuration.", reraise=True)
+def read_json_safety_config(
+    json_config_path: str = "src/configs/safety_config.json",
+) -> dict[str, Any]:
+    logger.info("Now reading json configuration for training...")
+
+    with open(json_config_path, "r") as f:
+        param_grid = json.load(f)
+    # convert back lists to tuples for ngram range
+    param_grid["features__tfidf__ngram_range"] = [
+        tuple(x) for x in param_grid["features__tfidf__ngram_range"]
+    ]
+    # fix class_weight dicts
+    new_class_weights = []
+    for cw in param_grid["clf__class_weight"]:
+        if isinstance(cw, dict):
+            cw = {int(k): v for k, v in cw.items()}  # convert str -> int
+        new_class_weights.append(cw)
+
+    param_grid["clf__class_weight"] = new_class_weights
+    logger.success("Read json configuration successfully.")
+
+    return param_grid
+
+
+@logger.catch(message="Unable to set_device.", reraise=True)
 def set_device(device_type: str = "auto") -> str:
     device = None
     if device_type == "auto":
