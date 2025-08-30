@@ -26,7 +26,7 @@ if not hf_token:
 
 @dataclass
 class InferencePipeline:
-    safety_model_path: str
+    safety_model_path: str = "models/safety-model-test.pkl"
     encoder_model_path: str = "lora_sft_encoder.pth"
 
     def __post_init__(self):
@@ -43,7 +43,7 @@ class InferencePipeline:
             self.fasttext_model = FasttextClassifier(
                 categories=active_categories, model_dir=Path(fasttext_model_path)
             )
-        logger.info("Loaded fasttext heads for Stage 2 checks.")
+        logger.success("Loaded fasttext heads for Stage 2 checks.")
 
         self.encoder = self._load_encoder()
         logger.success("Loaded encoder model for Stage 3 checks.")
