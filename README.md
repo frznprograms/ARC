@@ -12,7 +12,6 @@
 ---
 
 ### Project Overview
-### Project Overview
 
 This project tackles the challenge of distinguishing between trustworthy and untrustworthy reviews. Our approach combines machine learning and deep learning models in an ensemble framework. By stacking these models in ascending order of computational cost, the system can quickly filter obvious spam with lightweight models, while reserving more expensive deep learning methods for the harder cases. This layered strategy amortizes the overall cost of prediction, ensuring both efficiency and accuracy in filtering reviews.
 
@@ -68,6 +67,11 @@ uv pip install -e .
   journal={arXiv preprint arXiv:1612.03651},
   year={2016}
 }
+```
+
+#### Google Maps Dataset 
+```
+https://www.kaggle.com/datasets/denizbilginn/google-maps-restaurant-reviews
 ```
 
 #### Internet Violence Study (InViS) Dataset
