@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from typing import Iterable, Optional
 
-from fasttext_head import FasttextHead
+from src.fasttext.fasttext_head import FasttextHead
 
 DEFAULT_CATEGORIES = ["spam", "ad", "irrelevant", "rant", "unsafe"]
 

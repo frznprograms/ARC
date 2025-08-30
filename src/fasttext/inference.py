@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict
 
 # Adjust if needed
-from fasttext_classifier import FasttextClassifier
+from src.fasttext.fasttext_classifier import FasttextClassifier
 
 
 def parse_thresholds(s: str) -> Dict[str, float]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from fasttext_head import FasttextHead
+from src.fasttext.fasttext_head import FasttextHead
 
 
 def parse_args():

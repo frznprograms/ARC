@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from typing import List, Tuple
 
-from fasttext_head import FasttextHead
+from src.fasttext.fasttext_head import FasttextHead
 from sklearn.metrics import confusion_matrix, precision_score, recall_score
 
 

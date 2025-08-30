@@ -1,5 +1,7 @@
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import joblib
@@ -9,50 +11,89 @@ from huggingface_hub import snapshot_download
 from loguru import logger
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import logging as hf_logging
+
+from src.fasttext.fasttext_classifier import FasttextClassifier
+from src.utils.base_helpers import suppress_stdout_stderr
 
 load_dotenv()
 # Get token from environment
 hf_token = os.getenv("HF_HUB_TOKEN")
 
 if not hf_token:
-    logger.error("HF_HUB_TOKEN not found in .env")
+    logger.warning("HF_HUB_TOKEN not found in environment.")
 
 
 @dataclass
 class InferencePipeline:
     safety_model_path: str
-    fasttext_model_path: str
     encoder_model_path: str = "lora_sft_encoder.pth"
 
     def __post_init__(self):
+        hf_logging.set_verbosity_error()
+        logger.info("Loading models...")
         self.safety_model = joblib.load(self.safety_model_path)
-        self.fasttext_model = snapshot_download(
-            repo_id="RunjiaChen/fasttext", token=hf_token
-        )
+        logger.success("Loaded safety model for Stage 1 checks.")
+
+        with suppress_stdout_stderr():
+            fasttext_model_path = snapshot_download(
+                repo_id="RunjiaChen/fasttext", token=hf_token
+            )
+            active_categories = ["ad", "irrelevant", "rant", "unsafe"]
+            self.fasttext_model = FasttextClassifier(
+                categories=active_categories, model_dir=Path(fasttext_model_path)
+            )
+        logger.info("Loaded fasttext heads for Stage 2 checks.")
+
         self.encoder = self._load_encoder()
+        logger.success("Loaded encoder model for Stage 3 checks.")
 
     @logger.catch(message="Unable to complete inference for review.", reraise=True)
-    def run_inference(self, review_and_metdata: dict[str, Any]) -> int:
+    def run_inference(
+        self,
+        review_and_metdata: dict[str, Any],
+        default_threshold: float = 0.7,
+    ) -> int:
         review = review_and_metdata.get("review", None)
         if review is None:
             logger.error("Review is empty.")
 
+        if isinstance(review, str):
+            review = [review]
         safe_value = self.safety_model.predict(review)
         pred_strength = self.safety_model.predict_proba(review)[:, 1]
         if safe_value > 0:
             logger.warning(
-                f"The review did not pass the saftey check with probabilit {pred_strength}, \
-                    and has been flagged for rejection."
+                f"The review did not pass the saftey check with probability {pred_strength}, and has therefore been rejected."
             )
             return 1
 
-        self.fasttext_model.predict(
-            review
-        )  # TODO: implement prediction logic for fasttext
+        # fasttext section, stage 2
+        prompt = f"""
+            Business Name: {review_and_metdata["name"]}
+            Category: {review_and_metdata["category"]}
+            Description: {review_and_metdata["description"]}
+            Review: {review_and_metdata["review"]}
+            Rating: {review_and_metdata["rating"]}
+        """
+        prompt = prompt.replace("\n", "").strip()
+
+        label, fired = self.fasttext_model.predict_or_gate(
+            prompt,
+            default_threshold=default_threshold,
+            return_triggering_heads=True,
+        )
+        if label == "bad":
+            logger.warning(
+                f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
+            )
+            return 2
+        else:
+            logger.success("Review was accepted!")
 
         # encoder section, stage 3
         inputs = self.tokenizer(
-            review, return_tensors="pt", truncation=True, padding=True, max_length=512
+            prompt, return_tensors="pt", truncation=True, padding=True, max_length=512
         )
         with torch.no_grad():
             outputs = self.encoder(**inputs)
@@ -60,10 +101,14 @@ class InferencePipeline:
             preds = (probs > 0.5).int()
 
         # since prediction is just one value
-        final_pred = bool(preds[0])
-        logger.info(
-            f"Final prediction after 3 stages is {final_pred} with probability {probs}."
-        )
+        final_pred_val = torch.max(preds, dim=0)
+        final_pred_accept = "Accept" if final_pred_val == 0 else "Reject"
+        if final_pred_accept:
+            logger.success("Review was accepted!")
+        else:
+            logger.info(
+                f"Final prediction after 3 stages is {final_pred_accept} with probability {probs}."
+            )
         return 3
 
     @logger.catch(message="Unable to load encoder.", reraise=True)
@@ -126,3 +171,15 @@ class InferencePipeline:
         model.eval()
 
         return model
+
+
+if __name__ == "__main__":
+    ip = InferencePipeline(safety_model_path="models/safety-model-test.pkl")
+
+    reviews = []
+    for i in range(1, 4):
+        with open(f"data/for_model/review_{i}.json", "r") as f:
+            reviews.append(json.load(f))
+
+    for review in reviews:
+        ip.run_inference(review)

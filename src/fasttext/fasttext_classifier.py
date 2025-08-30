@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
-from fasttext_head import FasttextHead
+from src.fasttext.fasttext_head import FasttextHead
 
 
 class FasttextClassifier:
