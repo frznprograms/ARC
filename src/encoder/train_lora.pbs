@@ -14,6 +14,10 @@ cd $PBS_O_WORKDIR
 module purge
 module load cuda/12.2.2
 
+uv sync
+source .venv/bin/activate
+cd src/encoder
+
 export CUDA_HOME="/app/apps/cuda/12.2.2"
 export PATH="/app/apps/cuda/12.2.2/bin:$PATH"
 
