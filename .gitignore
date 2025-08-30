@@ -57,3 +57,5 @@ coverage.xml
 
 data/*
 data.csv
+
+extracted_labels/*
