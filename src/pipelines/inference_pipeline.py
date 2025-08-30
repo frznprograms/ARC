@@ -92,7 +92,9 @@ class InferencePipeline:
             )
             return stage
         else:
-            logger.success(f"Review was accepted at stage {stage}!")
+            logger.success(
+                f"Review was accepted at stage {stage} and passed all policies!"
+            )
 
         # encoder section, stage 3
         stage += 1
@@ -108,7 +110,9 @@ class InferencePipeline:
         final_pred_val = torch.max(preds, dim=0)
         final_pred_accept = "Accept" if final_pred_val == 0 else "Reject"
         if final_pred_accept:
-            logger.success(f"Review was accepted at stage {stage}!")
+            logger.success(
+                f"Review was accepted at stage {stage} and passed all policies!"
+            )
         else:
             logger.info(
                 f"Final prediction after 3 stages is {final_pred_accept} with probability {probs}."
