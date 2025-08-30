@@ -388,13 +388,6 @@ Actual   POS    313    31
 - **Recall**: 90.99% (313/344)
 - **Performance**: Very good - balanced precision and recall
 
-#### Key Insights
-
-1. **Best Performance**: Spam detection achieves near-perfect results with 100% precision and 99.73% recall
-2. **Challenging Categories**: Rant detection shows the lowest performance, likely due to the smallest number of positive samples (49 instances)
-3. **Class Imbalance**: The dataset shows significant class imbalance, with negative samples heavily outweighing positive samples across all categories
-4. **Overall Reliability**: All models demonstrate high precision (>89%), making them suitable for production use with low false positive rates
-
 #### Technical Notes
 
 - **Evaluation Method**: Standard binary classification metrics on held-out test set
