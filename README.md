@@ -55,8 +55,34 @@ We have created several scripts (both .py and .sh) to allow users to run inferen
 uv run -m src.pipelines.inference_pipeline
 ```
 
+Alternatively, for those who prefer to configure entirely in command line, you can run: 
+
+```bash
+./run.sh
+``` 
+from root. Below is a decscription of the possible args you can configure:
+
+| Argument        | Type  | Required | Default                         | Description                                                  |
+|-----------------|-------|----------|---------------------------------|--------------------------------------------------------------|
+| `--safety-model` | str   | No       | `models/safety-model-test.pkl`  | Path to the safety model `.pkl` file                         |
+| `--encoder-model` | str   | No       | `lora_sft_encoder.pth`          | Path to encoder model weights (`.pth`)                       |
+| `--review-file`  | str   | No       | `data/for_model/review_1.json`  | Path to JSON review file (with name, category, description, review, rating) |
+| `--threshold`    | float | No       | `0.7`                           | Threshold for fasttext heads                                 |
+
+**Note**: the pipeline was designed to take only one review (i.e. one dictionary) at a time. This was a specific design choice, as logically reviews should be evaluated the moment they are posted, not after some time until enough samples are curated for batched inference. We have taken care to ensure our pipeline is efficient at inference for each sample.
 
 ---
+
+### Sample Web Application 
+
+We have included a sample web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root: 
+
+```bash
+# launch app
+./launch_app.sh
+```
+
+And simply close the tab in your browser or press `Ctrl + c` to terminate.
 
 ### Citations
 
