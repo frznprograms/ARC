@@ -1,13 +1,13 @@
 {
     "clf__class_weight": {
         "0": 1.0,
-        "1": 5.0
+        "1": 1.5
     },
     "clf__max_iter": 1000,
-    "features__tfidf__max_features": 50000,
-    "features__tfidf__min_df": 10,
+    "features__tfidf__max_features": 75000,
+    "features__tfidf__min_df": 5,
     "features__tfidf__ngram_range": [
         1,
-        1
+        2
     ]
 }

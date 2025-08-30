@@ -4,7 +4,6 @@ import joblib
 from dataclasses import dataclass, field
 import pandas as pd
 from loguru import logger
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
@@ -12,22 +11,8 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 from src.utils.base_helpers import read_json_safety_config, timed_execution
+from src.utils.lexicon_features import LexiconFeatureExtractor
 from src.utils.toxic_lexicon import toxic_lexicon
-
-
-class LexiconFeatureExtractor(BaseEstimator, TransformerMixin):
-    def __init__(self, lexicon):
-        self.lexicon = lexicon
-
-    def fit(self, X, y=None):
-        # do nothing
-        return self
-
-    def transform(self, X):
-        return [
-            [1 if any(word in text.lower() for word in self.lexicon) else 0]
-            for text in X
-        ]
 
 
 @dataclass
@@ -68,7 +53,7 @@ class SafetyPipeline:
             estimator=self.pipeline,
             param_grid=param_grid,
             cv=cv,
-            scoring="recall",
+            scoring="f1",
             n_jobs=-1,
         )
         search.fit(self.X_train, self.y_train)
@@ -87,14 +72,17 @@ class SafetyPipeline:
 
     @timed_execution
     @logger.catch(message="Unable to finish evaluating pipeline.", reraise=True)
-    def eval_pipeline(self):
+    def eval_pipeline(self, threshold: float = 0.5):
         logger.info("Now evaluating, please do not interrupt...")
-        y_pred = self.pipeline.predict(self.X_test)
+        y_pred_prob = self.pipeline.predict_proba(self.X_test)[:, 1]
+        y_pred = (y_pred_prob >= threshold).astype(int)
+
         report = classification_report(self.y_test, y_pred)
         accuracy = accuracy_score(self.y_test, y_pred)
 
         print(report)
         print(f"Accuracy: {accuracy:.4f}")
+
         return report, accuracy
 
     @logger.catch(message="Unable to prepare train-test split.")
