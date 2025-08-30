@@ -1,12 +1,61 @@
-# environments
-*.env
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# python caches
-*.pyc
-*__pycache__/
+# C extensions
+*.so
 
-# data
-data/
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# other rubbish
-*.DS_Store
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# dotenv / secret files
+.env
+.env.*
+secrets.json
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Pytest cache
+.pytest_cache/
+
+# MyPy cache
+.mypy_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+
+data/*
+data.csv
+
+extracted_labels/*
