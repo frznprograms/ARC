@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -P 71001002
+#PBS -q ic102
+#PBS -N sft_lora_train
+#PBS -l select=1:ngpus=8
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o train_lora.log
+
+# Change to working directory
+cd $PBS_O_WORKDIR
+
+# Load CUDA module
+module purge
+module load cuda/12.2.2
+
+export CUDA_HOME="/app/apps/cuda/12.2.2"
+export PATH="/app/apps/cuda/12.2.2/bin:$PATH"
+
+source .venv/bin/activate
+
+# Run training
+python sft_encoder.py
