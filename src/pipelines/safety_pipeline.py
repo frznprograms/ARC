@@ -1,13 +1,14 @@
-from pathlib import Path
 import json
-import joblib
 from dataclasses import dataclass, field
+from pathlib import Path
+
+import joblib
 import pandas as pd
 from loguru import logger
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 from src.utils.base_helpers import read_json_safety_config, timed_execution
@@ -25,7 +26,7 @@ class SafetyPipeline:
         tfidf = TfidfVectorizer()
         features = FeatureUnion(
             [
-                ("tfidf", tfidf),
+                ("tfidf", tfidf),  # type: ignore
                 ("lexicon", LexiconFeatureExtractor(toxic_lexicon)),
             ]
         )

@@ -9,6 +9,7 @@ Usage:
 """
 
 from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path
@@ -52,12 +53,22 @@ def main():
     ap = argparse.ArgumentParser(
         description="Infer good/bad with multi-head fastText OR-gate."
     )
-    ap.add_argument("--model-dir", required=True, help="Directory with <category>.bin heads.")
+    ap.add_argument(
+        "--model-dir", required=True, help="Directory with <category>.bin heads."
+    )
     ap.add_argument("--text", required=True, help="Input string to classify.")
-    ap.add_argument("--default-threshold", type=float, default=None,
-                    help="Default probability threshold for all heads.")
-    ap.add_argument("--per-head-thresholds", type=parse_thresholds, default=None,
-                    help='Optional per-head thresholds, e.g. "spam:0.7,ad:0.6".')
+    ap.add_argument(
+        "--default-threshold",
+        type=float,
+        default=None,
+        help="Default probability threshold for all heads.",
+    )
+    ap.add_argument(
+        "--per-head-thresholds",
+        type=parse_thresholds,
+        default=None,
+        help='Optional per-head thresholds, e.g. "spam:0.7,ad:0.6".',
+    )
     args, unknown = ap.parse_known_args()
 
     model_dir = Path(args.model_dir)
@@ -66,8 +77,12 @@ def main():
     # Build dynamic parser for enable/disable flags
     ap2 = argparse.ArgumentParser()
     for cat in categories:
-        ap2.add_argument(f"--{cat}", type=str, choices=["true", "false"],
-                         help=f"Enable/disable {cat} head (default: true).")
+        ap2.add_argument(
+            f"--{cat}",
+            type=str,
+            choices=["true", "false"],
+            help=f"Enable/disable {cat} head (default: true).",
+        )
     flags = ap2.parse_args(unknown)
 
     # Convert to dict of {cat: bool}
@@ -90,7 +105,11 @@ def main():
         return_triggering_heads=True,
     )
 
-    result = {"label": label, "fired_heads": fired, "disabled_heads": [c for c in categories if not enabled[c]]}
+    result = {
+        "label": label,
+        "fired_heads": fired,
+        "disabled_heads": [c for c in categories if not enabled[c]],
+    }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

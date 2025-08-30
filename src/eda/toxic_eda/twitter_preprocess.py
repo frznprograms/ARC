@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-from loguru import logger
 import re
-import pandas as pd
-from typing import Union
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
+
+import pandas as pd
+from loguru import logger
 
 from src.eda.toxic_eda.base_preprocess import BaseProcessor
 

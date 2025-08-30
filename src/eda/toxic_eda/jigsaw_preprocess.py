@@ -1,16 +1,15 @@
 from dataclasses import dataclass
-
-from src.eda.toxic_eda.base_preprocess import BaseProcessor
-from loguru import logger
-from typing import Union
 from pathlib import Path
+from typing import Union
 
 import pandas as pd
+from loguru import logger
+
+from src.eda.toxic_eda.base_preprocess import BaseProcessor
 
 
 @dataclass
 class JigsawProcessor(BaseProcessor):
-
     # since each dataset has its own unique columns and properties,
     # it is likely more efficient to handle each dataset separately
     def preprocess(self, save_path: Union[str, Path]) -> pd.DataFrame:

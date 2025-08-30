@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import os
-from dotenv import load_dotenv
-from huggingface_hub import snapshot_download
-import argparse
-import json
 from pathlib import Path
-from typing import Dict
+
+from dotenv import load_dotenv
 
 # Adjust if needed
 from fasttext_classifier import FasttextClassifier
+from huggingface_hub import snapshot_download
+
 
 def get_fasttext():
-
     # Load environment variables from .env
     load_dotenv()
 
@@ -23,10 +21,7 @@ def get_fasttext():
         raise ValueError("HF_HUB_TOKEN not found in .env")
 
     # Download model with authentication
-    model_path = snapshot_download(
-        repo_id="RunjiaChen/fasttext",
-        token=hf_token
-    )
+    model_path = snapshot_download(repo_id="RunjiaChen/fasttext", token=hf_token)
 
     print("Model downloaded to:", model_path)
 
@@ -34,6 +29,7 @@ def get_fasttext():
     active_categories = ["ad", "irrelevant", "rant", "unsafe"]
     clf = FasttextClassifier(categories=active_categories, model_dir=Path(model_path))
     return clf
+
 
 # label, fired = clf.predict_or_gate(
 #     text,

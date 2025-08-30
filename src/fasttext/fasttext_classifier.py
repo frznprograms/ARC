@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
+
 from fasttext_head import FasttextHead
 
 
@@ -14,6 +16,7 @@ class FasttextClassifier:
     You can pass per-head positive labels via `positive_label_map`,
     otherwise defaults to "__label__pos".
     """
+
     def __init__(
         self,
         categories: Iterable[str],
@@ -36,7 +39,9 @@ class FasttextClassifier:
                 if mp.exists():
                     model_path = mp
 
-            self.heads[cat] = FasttextHead(label=cat, model_path=model_path, positive_label=pos_label)
+            self.heads[cat] = FasttextHead(
+                label=cat, model_path=model_path, positive_label=pos_label
+            )
 
     # --------------------- Training ---------------------
     def train_all(
@@ -56,7 +61,9 @@ class FasttextClassifier:
         for cat, head in self.heads.items():
             train_file = data_dir / f"{cat}.txt"
             if not train_file.exists():
-                raise FileNotFoundError(f"Missing training file for category '{cat}': {train_file}")
+                raise FileNotFoundError(
+                    f"Missing training file for category '{cat}': {train_file}"
+                )
             print(f"==> Training head: {cat}")
             head.train(
                 train_file,
@@ -100,6 +107,7 @@ class FasttextClassifier:
               - Tuple[str, List[str]] or List[Tuple[str, List[str]]]
                 where second element lists heads that fired.
         """
+
         def th(cat: str) -> Optional[float]:
             if threshold_per_head and cat in threshold_per_head:
                 return threshold_per_head[cat]

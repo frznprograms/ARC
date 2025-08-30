@@ -1,16 +1,16 @@
 from dataclasses import dataclass
-from datasets import load_dataset
-import pandas as pd
-from typing import Union
-from loguru import logger
 from pathlib import Path
+from typing import Union
+
+import pandas as pd
+from datasets import load_dataset
+from loguru import logger
 
 from src.eda.toxic_eda.base_preprocess import BaseProcessor
 
 
 @dataclass
 class ToxigenProcessor(BaseProcessor):
-
     def __post_init__(self):
         self.read_hf_data()
 

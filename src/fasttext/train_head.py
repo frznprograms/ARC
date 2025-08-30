@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
+
 from fasttext_head import FasttextHead
 
 
@@ -10,14 +12,21 @@ def parse_args():
         description="Train a single FasttextHead for one category."
     )
     # Required I/O
-    ap.add_argument("--category", required=True, help="Category name for this head (e.g., spam).")
+    ap.add_argument(
+        "--category", required=True, help="Category name for this head (e.g., spam)."
+    )
     ap.add_argument("--train-file", required=True, help="Path to training text file.")
     ap.add_argument("--out", required=True, help="Output .bin model path.")
 
     # Optional preload / positive label
-    ap.add_argument("--preload", default=None, help="Existing .bin to warm-start this head.")
-    ap.add_argument("--positive-label", default="__label__pos",
-                    help="Which label counts as positive (default: __label__pos).")
+    ap.add_argument(
+        "--preload", default=None, help="Existing .bin to warm-start this head."
+    )
+    ap.add_argument(
+        "--positive-label",
+        default="__label__pos",
+        help="Which label counts as positive (default: __label__pos).",
+    )
 
     # Hyperparams
     ap.add_argument("--lr", type=float, default=0.5)
@@ -28,12 +37,20 @@ def parse_args():
     ap.add_argument("--wordNgrams", type=int, default=2)
 
     # Autotune
-    ap.add_argument("--autotune", action="store_true",
-                    help="Use fastText autotune if a valid file is provided or discovered.")
-    ap.add_argument("--autotune-duration", type=int, default=60, help="seconds for autotune")
-    ap.add_argument("--valid-file", default=None,
-                    help="Optional validation file for autotune. "
-                         "If omitted, will try <train_file_stem>_valid.txt when --autotune is set.")
+    ap.add_argument(
+        "--autotune",
+        action="store_true",
+        help="Use fastText autotune if a valid file is provided or discovered.",
+    )
+    ap.add_argument(
+        "--autotune-duration", type=int, default=60, help="seconds for autotune"
+    )
+    ap.add_argument(
+        "--valid-file",
+        default=None,
+        help="Optional validation file for autotune. "
+        "If omitted, will try <train_file_stem>_valid.txt when --autotune is set.",
+    )
 
     return ap.parse_args()
 

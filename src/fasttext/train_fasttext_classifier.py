@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
-from typing import Iterable, List, Optional, Dict
+from typing import Iterable, Optional
+
 from fasttext_head import FasttextHead
 
 DEFAULT_CATEGORIES = ["spam", "ad", "irrelevant", "rant", "unsafe"]
@@ -14,20 +16,37 @@ def parse_args():
     )
 
     # I/O
-    ap.add_argument("--data-dir", required=True,
-                    help="Directory containing <category>.txt (and optional <category>_valid.txt).")
-    ap.add_argument("--out-dir", required=True,
-                    help="Directory to save <category>.bin models.")
-    ap.add_argument("--categories", nargs="*", default=DEFAULT_CATEGORIES,
-                    help=f"List of categories. Default: {DEFAULT_CATEGORIES}")
-    ap.add_argument("--preload-dir", default=None,
-                    help="Optional directory to warm-start from existing <category>.bin if present.")
-    ap.add_argument("--skip-missing", action="store_true",
-                    help="Skip categories whose training file is missing instead of raising an error.")
+    ap.add_argument(
+        "--data-dir",
+        required=True,
+        help="Directory containing <category>.txt (and optional <category>_valid.txt).",
+    )
+    ap.add_argument(
+        "--out-dir", required=True, help="Directory to save <category>.bin models."
+    )
+    ap.add_argument(
+        "--categories",
+        nargs="*",
+        default=DEFAULT_CATEGORIES,
+        help=f"List of categories. Default: {DEFAULT_CATEGORIES}",
+    )
+    ap.add_argument(
+        "--preload-dir",
+        default=None,
+        help="Optional directory to warm-start from existing <category>.bin if present.",
+    )
+    ap.add_argument(
+        "--skip-missing",
+        action="store_true",
+        help="Skip categories whose training file is missing instead of raising an error.",
+    )
 
     # Labels
-    ap.add_argument("--positive-label", default="__label__pos",
-                    help="Positive class label used by each head. Default: __label__pos")
+    ap.add_argument(
+        "--positive-label",
+        default="__label__pos",
+        help="Positive class label used by each head. Default: __label__pos",
+    )
 
     # Hyperparams
     ap.add_argument("--lr", type=float, default=0.5)
@@ -38,12 +57,19 @@ def parse_args():
     ap.add_argument("--wordNgrams", type=int, default=2)
 
     # Autotune
-    ap.add_argument("--autotune", action="store_true",
-                    help="Use fastText autotune if <category>_valid.txt exists (or is provided via --valid-suffix).")
-    ap.add_argument("--autotune-duration", type=int, default=60,
-                    help="Seconds to spend autotuning.")
-    ap.add_argument("--valid-suffix", default="_valid.txt",
-                    help="Validation filename suffix (e.g., '_dev.txt'). Default: _valid.txt")
+    ap.add_argument(
+        "--autotune",
+        action="store_true",
+        help="Use fastText autotune if <category>_valid.txt exists (or is provided via --valid-suffix).",
+    )
+    ap.add_argument(
+        "--autotune-duration", type=int, default=60, help="Seconds to spend autotuning."
+    )
+    ap.add_argument(
+        "--valid-suffix",
+        default="_valid.txt",
+        help="Validation filename suffix (e.g., '_dev.txt'). Default: _valid.txt",
+    )
 
     return ap.parse_args()
 
@@ -88,7 +114,9 @@ def train_heads_sequential(
         if preload_path:
             print(f"[{cat}] warm-start from: {preload_path}")
 
-        head = FasttextHead(label=cat, model_path=preload_path, positive_label=positive_label)
+        head = FasttextHead(
+            label=cat, model_path=preload_path, positive_label=positive_label
+        )
 
         valid_path = None
         if autotune:

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Union
+
 import fasttext
 
 
@@ -12,6 +14,7 @@ class FasttextHead:
     Assumes binary labels in the training file (e.g., __label__pos / __label__neg).
     `positive_label` defines which label counts as "positive" for this head.
     """
+
     def __init__(
         self,
         label: str,
@@ -28,12 +31,16 @@ class FasttextHead:
     def load(self, model_path: Union[str, Path]) -> None:
         model_path = Path(model_path)
         if not model_path.exists():
-            raise FileNotFoundError(f"Model file not found for head '{self.label}': {model_path}")
+            raise FileNotFoundError(
+                f"Model file not found for head '{self.label}': {model_path}"
+            )
         self.model = fasttext.load_model(str(model_path))
 
     def save(self, out_path: Union[str, Path]) -> None:
         if self.model is None:
-            raise RuntimeError(f"Head '{self.label}' has no trained/loaded model to save.")
+            raise RuntimeError(
+                f"Head '{self.label}' has no trained/loaded model to save."
+            )
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         self.model.save_model(str(out_path))
@@ -59,7 +66,9 @@ class FasttextHead:
         """
         input_path = Path(input_path)
         if not input_path.exists():
-            raise FileNotFoundError(f"Training file not found for head '{self.label}': {input_path}")
+            raise FileNotFoundError(
+                f"Training file not found for head '{self.label}': {input_path}"
+            )
 
         if autotune:
             if valid_path is None:
@@ -74,7 +83,9 @@ class FasttextHead:
                 )
                 return
             else:
-                print(f"[{self.label}] no validation file at {valid_path}; using fixed params.")
+                print(
+                    f"[{self.label}] no validation file at {valid_path}; using fixed params."
+                )
 
         print(f"[{self.label}] training with fixed hyperparams.")
         self.model = fasttext.train_supervised(
@@ -119,16 +130,22 @@ class FasttextHead:
             return False
         if labels[0] != self.positive_label:
             return False
-        return (threshold is None) or (probs[0] >= threshold)
+        return (threshold is None) or (probs[0] >= threshold)  # type: ignore
 
-    def is_positive_batch(self, texts: Iterable[str], *, threshold: Optional[float] = None) -> List[bool]:
+    def is_positive_batch(
+        self, texts: Iterable[str], *, threshold: Optional[float] = None
+    ) -> List[bool]:
         """
         Batch version of is_positive.
         """
         raw = self.predict_raw(list(texts), k=1)  # list of (labels, probs)
         out: List[bool] = []
         for labels, probs in raw:
-            if labels and labels[0] == self.positive_label and ((threshold is None) or (probs[0] >= threshold)):
+            if (
+                labels
+                and labels[0] == self.positive_label  # type: ignore
+                and ((threshold is None) or (probs[0] >= threshold))  # type: ignore
+            ):
                 out.append(True)
             else:
                 out.append(False)

@@ -16,11 +16,12 @@ Output:
 import argparse
 import csv
 import os
-import sys
 import random
-from typing import Iterable, Dict, List, Any, Tuple
+import sys
+from typing import Any, Dict, Iterable, List, Tuple
 
 CATEGORIES = ["spam", "ad", "irrelevant", "rant", "unsafe"]
+
 
 def load_samples_csv(path: str) -> List[Dict[str, Any]]:
     """Load samples from a CSV file with required headers."""
@@ -60,8 +61,10 @@ def load_samples_csv(path: str) -> List[Dict[str, Any]]:
             samples.append(sample)
     return samples
 
+
 def normalize_text(s: str) -> str:
     return " ".join(s.replace("\t", " ").replace("\n", " ").split())
+
 
 def validate_sample(idx: int, sample: Dict[str, Any]) -> None:
     missing = [k for k in CATEGORIES + ["text"] if k not in sample]
@@ -74,14 +77,19 @@ def validate_sample(idx: int, sample: Dict[str, Any]) -> None:
     if not isinstance(sample["text"], str):
         raise ValueError(f"Sample #{idx} 'text' must be a string.")
 
+
 def gen_fasttext_line(label_val: int, text: str) -> str:
     label = "__label__pos" if label_val == 1 else "__label__neg"
     return f"{label} {text}"
 
-def split_samples(samples: List[Dict[str, Any]], train_ratio: float = 0.9) -> Tuple[List, List]:
+
+def split_samples(
+    samples: List[Dict[str, Any]], train_ratio: float = 0.9
+) -> Tuple[List, List]:
     random.shuffle(samples)
     cutoff = int(len(samples) * train_ratio)
     return samples[:cutoff], samples[cutoff:]
+
 
 def write_outputs(samples: Iterable[Dict[str, Any]], out_dir: str) -> None:
     os.makedirs(out_dir, exist_ok=True)
@@ -101,10 +109,18 @@ def write_outputs(samples: Iterable[Dict[str, Any]], out_dir: str) -> None:
         for f in files.values():
             f.close()
 
+
 def main():
-    ap = argparse.ArgumentParser(description="Convert labeled reviews (CSV) to fastText files with train/eval split.")
+    ap = argparse.ArgumentParser(
+        description="Convert labeled reviews (CSV) to fastText files with train/eval split."
+    )
     ap.add_argument("input_path", help="Path to CSV file of samples")
-    ap.add_argument("-o", "--out-dir", default="fasttext_out", help="Directory to write output files")
+    ap.add_argument(
+        "-o",
+        "--out-dir",
+        default="fasttext_out",
+        help="Directory to write output files",
+    )
     args = ap.parse_args()
 
     samples = load_samples_csv(args.input_path)
@@ -117,7 +133,10 @@ def main():
     write_outputs(train_samples, os.path.join(args.out_dir, "train"))
     write_outputs(eval_samples, os.path.join(args.out_dir, "eval"))
 
-    print(f"Done. Wrote train ({len(train_samples)}) and eval ({len(eval_samples)}) samples into {args.out_dir}/train and {args.out_dir}/eval")
+    print(
+        f"Done. Wrote train ({len(train_samples)}) and eval ({len(eval_samples)}) samples into {args.out_dir}/train and {args.out_dir}/eval"
+    )
+
 
 if __name__ == "__main__":
     main()

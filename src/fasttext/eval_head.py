@@ -1,23 +1,45 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
 from typing import List, Tuple
-from sklearn.metrics import confusion_matrix, precision_score, recall_score
+
 from fasttext_head import FasttextHead
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
 
 
 def parse_args():
-    ap = argparse.ArgumentParser(description="Evaluate one FasttextHead on a labeled test file.")
-    ap.add_argument("--category", required=True, help="Category name of the head (for logging only).")
-    ap.add_argument("--model", required=True, help="Path to trained .bin fastText model.")
-    ap.add_argument("--test-file", required=True, help="Test set (fastText supervised format).")
-    ap.add_argument("--positive-label", default="__label__pos",
-                    help="Label in test file to treat as positive (default: __label__pos).")
-    ap.add_argument("--neg-label", default=None,
-                    help="Optional explicit negative label. If omitted, anything not positive is treated as negative.")
-    ap.add_argument("--threshold", type=float, default=None,
-                    help="Optional probability threshold for positive (default: use top-1).")
+    ap = argparse.ArgumentParser(
+        description="Evaluate one FasttextHead on a labeled test file."
+    )
+    ap.add_argument(
+        "--category",
+        required=True,
+        help="Category name of the head (for logging only).",
+    )
+    ap.add_argument(
+        "--model", required=True, help="Path to trained .bin fastText model."
+    )
+    ap.add_argument(
+        "--test-file", required=True, help="Test set (fastText supervised format)."
+    )
+    ap.add_argument(
+        "--positive-label",
+        default="__label__pos",
+        help="Label in test file to treat as positive (default: __label__pos).",
+    )
+    ap.add_argument(
+        "--neg-label",
+        default=None,
+        help="Optional explicit negative label. If omitted, anything not positive is treated as negative.",
+    )
+    ap.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Optional probability threshold for positive (default: use top-1).",
+    )
     return ap.parse_args()
 
 
@@ -59,7 +81,9 @@ def main():
     y_true_bin = [1 if y == pos else 0 for y in labels_true]
 
     # Predicted labels (binary)
-    y_pred_bin = [1 if head.is_positive(t, threshold=args.threshold) else 0 for t in texts]
+    y_pred_bin = [
+        1 if head.is_positive(t, threshold=args.threshold) else 0 for t in texts
+    ]
 
     # Confusion matrix with fixed binary labels [1, 0] avoids string mismatches
     cm = confusion_matrix(y_true_bin, y_pred_bin, labels=[1, 0])
@@ -78,11 +102,15 @@ def main():
 
     # Optional: warn if the expected positive label never appears in y_true
     if sum(y_true_bin) == 0:
-        print("[warn] No positive examples found in y_true. Precision is computed on predicted positives only; "
-              "recall will be 0. Check --positive-label or your test file.")
+        print(
+            "[warn] No positive examples found in y_true. Precision is computed on predicted positives only; "
+            "recall will be 0. Check --positive-label or your test file."
+        )
     if sum(1 - y for y in y_true_bin) == 0:
-        print("[warn] No negative examples found in y_true. Metrics may be degenerate; "
-              "consider a more balanced test set.")
+        print(
+            "[warn] No negative examples found in y_true. Metrics may be degenerate; "
+            "consider a more balanced test set."
+        )
 
 
 if __name__ == "__main__":
