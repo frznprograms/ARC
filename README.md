@@ -69,13 +69,13 @@ from root. Below is a decscription of the possible args you can configure:
 | `--review-file`  | str   | No       | `data/for_model/review_1.json`  | Path to JSON review file (with name, category, description, review, rating) |
 | `--threshold`    | float | No       | `0.7`                           | Threshold for fasttext heads                                 |
 
-**Note**: the pipeline was designed to take only one review (i.e. one dictionary) at a time. This was a specific design choice, as logically reviews should be evaluated the moment they are posted, not after some time until enough samples are curated for batched inference. We have taken care to ensure our pipeline is efficient at inference for each sample.
+**Note**: the pipeline was designed to take only one review (i.e. one dictionary) at a time. This was a specific design choice, as logically reviews should be evaluated the moment they are posted, not after some time until enough samples are curated for batched inference. We have taken care to ensure our pipeline is **efficient** at inference for each sample.
 
 ---
 
 ### Sample Web Application 
 
-We have included a sample web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root: 
+We have included a minimal web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Please note it is not exactly what the real implementation will look like, as in real life users will not need to manually enter the name of the place they are reviewing, description, etc. These are things that need to be extracted by developers. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root: 
 
 ```bash
 # launch app
@@ -83,6 +83,16 @@ We have included a sample web application for users to play around with, just to
 ```
 
 And simply close the tab in your browser or press `Ctrl + c` to terminate.
+
+### Performance
+
+Our pipeline components performed quite well as isolated components. You may refer to the model performance metrics included in the "sub-READMEs" in `src/encoder`, `src/fasttext` and `src/safety` for more details. 
+
+For your own tests, we have included 3 sample reviews in `json` format, which you can find under `data/for_model`. Feel free to use those in our web app, and you can even play around with small word misspellings, or censors.
+
+### Trigger Warning
+
+To aid our model implementation, which utilises a lexicon-based component, we have included a set of toxic words under `src/utils/toxic_lexicon.py`, which can be offensive to some. 
 
 ### Citations
 
