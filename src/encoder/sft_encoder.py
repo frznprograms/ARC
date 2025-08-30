@@ -212,7 +212,7 @@ class ReviewDataProcessor:
         """
         Load labeled training data directly from CSV
         """
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path, encoding='utf-8-sig')
         prompts = []
         labels = []
 
