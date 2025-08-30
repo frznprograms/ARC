@@ -25,4 +25,6 @@ toxic_lexicon = {
     "nigga",
     "nigger",
     "coon",
+    "fk",
+    "bij",
 }

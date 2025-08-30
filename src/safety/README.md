@@ -28,7 +28,7 @@ Please see the table below for a summary of the evaluation performance of the Sa
 | Metric        | Precision | Recall | F1-score | Support |
 |---------------|-----------|--------|----------|---------|
 | Macro avg     | 0.84      | 0.85   | 0.85     | 107,369 |
-| Weighted avg  | 0.85      | 0.85   | 0.85     | 107,369 |
+| Weighted avg  | 0.86      | 0.85   | 0.85     | 107,369 |
 
 ### Analysis (A quick one) 
 
