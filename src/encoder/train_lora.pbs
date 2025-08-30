@@ -21,7 +21,5 @@ cd src/encoder
 export CUDA_HOME="/app/apps/cuda/12.2.2"
 export PATH="/app/apps/cuda/12.2.2/bin:$PATH"
 
-source .venv/bin/activate
-
 # Run training
 python sft_encoder.py
