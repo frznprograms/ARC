@@ -1,5 +1,7 @@
 # environments
 *.env
+venv
+.venv
 
 # python caches
 *.pyc
