@@ -4,10 +4,13 @@ from peft import PeftModel
 import os
 
 # Check if local LoRA weights exist, otherwise download from HuggingFace
-local_lora_path = ""
+local_lora_path = "lora_sft_encoder.pth"
 if not os.path.exists(local_lora_path):
     from huggingface_hub import hf_hub_download
-    lora_weights_path = "dolphin-in-teal-lake/sft-encoder" 
+    lora_weights_path = hf_hub_download(
+        repo_id="dolphin-in-teal-lake/sft-encoder",
+        filename="lora_sft_encoder.pth"
+    )
 else:
     lora_weights_path = local_lora_path
 
@@ -29,8 +32,8 @@ model = get_peft_model(base_model, lora_config)
 
 
 # Load weights
-if os.path.exists("lora_sft_encoder.pth"):
-    state_dict = torch.load("lora_sft_encoder.pth", map_location='cpu')
+if os.path.exists(lora_weights_path):
+    state_dict = torch.load(lora_weights_path, map_location='cpu')
     
     print("Keys in state_dict:")
     classifier_keys = []
@@ -55,9 +58,12 @@ if os.path.exists("lora_sft_encoder.pth"):
 
 model.eval()
 
-test_text = '''MY WIFE LIKES TO GET HER NAILS DONE AND THERE'S A PLACE ON MOTHER GASTON CALL SUN NAILS AND THEIR PRICES ARE VERY REASONABLE BUT LUCKY NAIL 
-            IS A LITTLE EXPENSIVE LOVE YOU TOO EXPENSIVE FOR MY TASTE FOR THE TYPE OF WORK THEY DO... SO I WOULD RECOMMEND A PLACE LIKE SUN NAILS EVEN IF IT'S OUT OF YOUR WAY 
-            A LITTLE BIT IT'S WORTH SAVING A COUPLE OF DOLLARS OR I WILL SAY A LITTLE MORE THAN A COUPLE OF DOLLARS IF YOU'RE GETTING MORE THAN JUST A NAIL IS DONE...
+test_text = '''Business Name: Happy Nails Salon
+Category: Hair salon
+Description: Offering nail services, hair cuts and styling
+Review: My nails look like a 5-year-old did them, the girl was rude, and the place was filthy. I'm seriously considering reporting them. If you value your money, don't even think about going there!
+Rating: 1
+Response: nan
             '''
             
 
@@ -69,5 +75,5 @@ with torch.no_grad():
     probabilities = torch.sigmoid(outputs.logits)
     predictions = (probabilities > 0.5).int()
 
-print("Predictions:", predictions)  # [advertisement, irrelevant_content, non_visitor_rant, toxicity]
+print("Predictions:", predictions)  
 print("Probabilities:", probabilities)

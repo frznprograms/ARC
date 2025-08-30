@@ -234,7 +234,6 @@ class ReviewDataProcessor:
         return prompts, responses
     
 
-
 class ReviewSFTTrainer:
     def __init__(self, model: ReviewSFTEncoder, device: str = 'cpu'):
         self.model = model.to(device)
