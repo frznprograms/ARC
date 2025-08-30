@@ -26,10 +26,10 @@ Your CSV file must have these columns:
 
 ```bash
 # Basic usage
-python src/fasttext/convert_csv_to_fasttext.py data/reviews.csv
+uv run python -m src.fasttext.convert_csv_to_fasttext data/reviews.csv
 
 # Specify custom output directory
-python src/fasttext/convert_csv_to_fasttext.py data/reviews.csv -o custom_output_dir
+uv run python -m src.fasttext.convert_csv_to_fasttext data/reviews.csv -o custom_output_dir
 ```
 
 ### Arguments
@@ -43,13 +43,13 @@ python src/fasttext/convert_csv_to_fasttext.py data/reviews.csv -o custom_output
 
 ```bash
 # Convert reviews.csv to FastText format in default directory
-python src/fasttext/convert_csv_to_fasttext.py data/labeled_reviews.csv
+uv run python -m src.fasttext.convert_csv_to_fasttext data/labeled_reviews.csv
 
 # Convert with custom output directory
-python src/fasttext/convert_csv_to_fasttext.py data/labeled_reviews.csv --out-dir fasttext_data
+uv run python -m src.fasttext.convert_csv_to_fasttext data/labeled_reviews.csv --out-dir fasttext_data
 
 # Convert large dataset
-python src/fasttext/convert_csv_to_fasttext.py data/10k_reviews.csv -o training_data
+uv run python -m src.fasttext.convert_csv_to_fasttext data/10k_reviews.csv -o training_data
 ```
 
 ### Output Structure
@@ -80,10 +80,10 @@ Trains FastText models for each category using the converted data files.
 
 ```bash
 # Basic training
-python src/fasttext/train_fasttext_classifier.py --data-dir fasttext_out/train --out-dir models
+uv run python -m src.fasttext.train_fasttext_classifier --data-dir fasttext_out/train --out-dir models
 
 # Training with custom hyperparameters
-python src/fasttext/train_fasttext_classifier.py --data-dir fasttext_out/train --out-dir models --lr 0.1 --epoch 25 --dim 200
+uv run python -m src.fasttext.train_fasttext_classifier --data-dir fasttext_out/train --out-dir models --lr 0.1 --epoch 25 --dim 200
 ```
 
 ### Arguments
@@ -123,12 +123,12 @@ python src/fasttext/train_fasttext_classifier.py --data-dir fasttext_out/train -
 
 ```bash
 # Basic training with default parameters
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models
 
 # Training with custom hyperparameters
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models \
   --lr 0.1 \
@@ -137,34 +137,34 @@ python src/fasttext/train_fasttext_classifier.py \
   --wordNgrams 3
 
 # Training only specific categories
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models \
   --categories spam ad unsafe
 
 # Training with autotune (requires validation files)
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models \
   --autotune \
   --autotune-duration 120
 
 # Warm-start from existing models
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir new_models \
   --preload-dir old_models \
   --epoch 5
 
 # Training with custom validation suffix
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models \
   --autotune \
   --valid-suffix _dev.txt
 
 # Skip missing categories instead of failing
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir fasttext_out/train \
   --out-dir models \
   --skip-missing
@@ -180,10 +180,10 @@ Run predictions using the trained models with a hard OR-gate approach.
 
 ```bash
 # Basic inference
-python src/fasttext/inference.py --model-dir models --text "Your text here"
+uv run python -m src.fasttext.inference --model-dir models --text "Your text here"
 
 # Inference with custom thresholds
-python src/fasttext/inference.py --model-dir models --text "Your text here" --default-threshold 0.7
+uv run python -m src.fasttext.inference --model-dir models --text "Your text here" --default-threshold 0.7
 ```
 
 ### Arguments
@@ -205,31 +205,31 @@ python src/fasttext/inference.py --model-dir models --text "Your text here" --de
 
 ```bash
 # Basic inference
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "This is a great product, buy now!"
 
 # Inference with custom threshold
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "Click here for amazing deals!" \
   --default-threshold 0.8
 
 # Inference with per-head thresholds
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "Limited time offer!" \
   --per-head-thresholds "spam:0.9,ad:0.7,unsafe:0.5"
 
 # Disable specific category heads
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "This product is terrible" \
   --spam false \
   --rant true
 
 # Enable only specific heads
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "Free money now!" \
   --spam true \
@@ -239,16 +239,16 @@ python src/fasttext/inference.py \
   --unsafe false
 
 # Real-world content examples
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "URGENT: Your account will be suspended unless you click this link immediately!"
 
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "I absolutely hate this company and their terrible customer service" \
   --default-threshold 0.6
 
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "The weather is nice today" \
   --per-head-thresholds "irrelevant:0.3"
@@ -278,12 +278,12 @@ Here's a complete example from CSV to inference:
 
 ```bash
 # 1. Convert CSV data to FastText format
-python src/fasttext/convert_csv_to_fasttext.py \
+uv run python -m src.fasttext.convert_csv_to_fasttext \
   data/reviews.csv \
   --out-dir training_data
 
 # 2. Train models with custom hyperparameters
-python src/fasttext/train_fasttext_classifier.py \
+uv run python -m src.fasttext.train_fasttext_classifier \
   --data-dir training_data/train \
   --out-dir models \
   --lr 0.1 \
@@ -291,7 +291,7 @@ python src/fasttext/train_fasttext_classifier.py \
   --dim 150
 
 # 3. Run inference on new content
-python src/fasttext/inference.py \
+uv run python -m src.fasttext.inference \
   --model-dir models \
   --text "Amazing discount! Click now before it expires!" \
   --default-threshold 0.75
