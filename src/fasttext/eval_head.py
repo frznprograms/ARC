@@ -12,8 +12,8 @@ def parse_args():
     ap.add_argument("--category", required=True, help="Category name of the head (for logging only).")
     ap.add_argument("--model", required=True, help="Path to trained .bin fastText model.")
     ap.add_argument("--test-file", required=True, help="Test set (fastText supervised format).")
-    ap.add_argument("--positive-label", default="__label__POS",
-                    help="Label in test file to treat as positive (default: __label__POS).")
+    ap.add_argument("--positive-label", default="__label__pos",
+                    help="Label in test file to treat as positive (default: __label__pos).")
     ap.add_argument("--neg-label", default=None,
                     help="Optional explicit negative label. If omitted, anything not positive is treated as negative.")
     ap.add_argument("--threshold", type=float, default=None,

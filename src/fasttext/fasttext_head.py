@@ -9,14 +9,14 @@ class FasttextHead:
     """
     Single fastText head for one category.
 
-    Assumes binary labels in the training file (e.g., __label__POS / __label__NEG).
+    Assumes binary labels in the training file (e.g., __label__pos / __label__neg).
     `positive_label` defines which label counts as "positive" for this head.
     """
     def __init__(
         self,
         label: str,
         model_path: Optional[Union[str, Path]] = None,
-        positive_label: str = "__label__POS",
+        positive_label: str = "__label__pos",
     ):
         self.label: str = label
         self.positive_label: str = positive_label

@@ -12,7 +12,7 @@ class FasttextClassifier:
       Else -> returns "bad"
 
     You can pass per-head positive labels via `positive_label_map`,
-    otherwise defaults to "__label__POS".
+    otherwise defaults to "__label__pos".
     """
     def __init__(
         self,
@@ -26,7 +26,7 @@ class FasttextClassifier:
         model_dir_path = Path(model_dir) if model_dir is not None else None
 
         for cat in self.categories:
-            pos_label = "__label__POS"
+            pos_label = "__label__pos"
             if positive_label_map and cat in positive_label_map:
                 pos_label = positive_label_map[cat]
 
@@ -90,7 +90,7 @@ class FasttextClassifier:
         return_triggering_heads: bool = False,
     ):
         """
-        If any head is positive -> "good", else "bad".
+        If any head is positive -> "bad", else "good".
         Optionally return which heads triggered for transparency.
 
         Returns:
@@ -110,7 +110,7 @@ class FasttextClassifier:
             for cat, head in self.heads.items():
                 if head.is_positive(text, threshold=th(cat)):
                     fired.append(cat)
-            label = "good" if len(fired) > 0 else "bad"
+            label = "bad" if len(fired) > 0 else "good"
             return (label, fired) if return_triggering_heads else label
 
         if isinstance(texts, str):

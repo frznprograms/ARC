@@ -26,8 +26,8 @@ def parse_args():
                     help="Skip categories whose training file is missing instead of raising an error.")
 
     # Labels
-    ap.add_argument("--positive-label", default="__label__POS",
-                    help="Positive class label used by each head. Default: __label__POS")
+    ap.add_argument("--positive-label", default="__label__pos",
+                    help="Positive class label used by each head. Default: __label__pos")
 
     # Hyperparams
     ap.add_argument("--lr", type=float, default=0.5)

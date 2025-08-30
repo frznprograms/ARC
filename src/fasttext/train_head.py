@@ -16,8 +16,8 @@ def parse_args():
 
     # Optional preload / positive label
     ap.add_argument("--preload", default=None, help="Existing .bin to warm-start this head.")
-    ap.add_argument("--positive-label", default="__label__POS",
-                    help="Which label counts as positive (default: __label__POS).")
+    ap.add_argument("--positive-label", default="__label__pos",
+                    help="Which label counts as positive (default: __label__pos).")
 
     # Hyperparams
     ap.add_argument("--lr", type=float, default=0.5)
