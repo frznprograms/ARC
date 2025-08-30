@@ -194,8 +194,6 @@ class ReviewDataProcessor:
                     batch_data = json.load(f)
 
                 for item in batch_data:
-                    # Extract the prompt (this would need to be reconstructed from job_id)
-                    # For now, we'll assume the prompt is stored or can be retrieved
                     job_id = item["job_id"]
 
                     # Convert string labels to integers
@@ -214,7 +212,7 @@ class ReviewDataProcessor:
         """
         Load labeled training data directly from CSV
         """
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path, encoding='utf-8-sig')
         prompts = []
         labels = []
 
@@ -438,7 +436,10 @@ def main():
 
     # Load labeled training data from CSV
     print("Loading training data...")
-    prompts, labels = processor.load_labeled_data_from_csv("final_hf_ds.csv")
+    # Get the path to data directory relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(script_dir, "..", "..", "data", "for_model", "final_huggingface_ds.csv")
+    prompts, labels = processor.load_labeled_data_from_csv(data_path)
     print(f"Loaded {len(prompts)} labeled samples from CSV")
 
     # Split data into train/validation sets
@@ -464,6 +465,16 @@ def main():
     results = trainer.train_model(
         train_dataloader, val_dataloader, num_epochs=2, save_path="lora_sft_encoder.pth"
     )
+    
+    # Save final metrics to results directory
+    results_dir = os.path.join(os.path.dirname(__file__), "results")
+    os.makedirs(results_dir, exist_ok=True)
+    
+    metrics_path = os.path.join(results_dir, "final_metrics.json")
+    with open(metrics_path, "w") as f:
+        json.dump(results["final_metrics"], f, indent=2)
+    
+    print(f"Final metrics saved to: {metrics_path}")
 
     # Test inference with a sample
     print("\nTesting inference...")

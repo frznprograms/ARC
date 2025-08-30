@@ -1,0 +1,20 @@
+{
+  "advertisement_accuracy": 0.9968809565066713,
+  "advertisement_precision": 1.0,
+  "advertisement_recall": 0.9692307692307692,
+  "advertisement_f1": 0.984375,
+  "irrelevant_content_accuracy": 0.9954947149540807,
+  "irrelevant_content_precision": 1.0,
+  "irrelevant_content_recall": 0.9373493975903614,
+  "irrelevant_content_f1": 0.9676616915422885,
+  "non_visitor_rant_accuracy": 0.9979206376711142,
+  "non_visitor_rant_precision": 1.0,
+  "non_visitor_rant_recall": 0.905511811023622,
+  "non_visitor_rant_f1": 0.9504132231404959,
+  "toxicity_accuracy": 0.9845780627274302,
+  "toxicity_precision": 0.9598145285935085,
+  "toxicity_recall": 0.9078947368421053,
+  "toxicity_f1": 0.9331329827197595,
+  "avg_loss": 0.020777899578448274,
+  "overall_accuracy": 0.9937185929648241
+}
