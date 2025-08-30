@@ -1,5 +1,6 @@
-<h1 style="text-align: center;">Rudy's Rangers Repository, TikTok Techjam 2025</h1>
-<h2 style="text-align: center;">Chosen Problem Statment: Filtering the Noise: ML for Trustworthy Location Reviews</h2>
+<h1 style="text-align: center;">ARC - Automated Review Checking with Machine Learning</h1>
+by Rudy's Rangers, for TikTok TechJam 2025
+<h3 style="text-align: center;">Chosen Problem Statment: Filtering the Noise: ML for Trustworthy Location Reviews</h2>
 
 ### Authors
 
@@ -7,7 +8,7 @@
 2. Tian Fengyao (Kyrie)  
 3. Lee Chun Wayne  
 4. Shane Vivek Bharathan  
-5. Chen Runjia (Rudy)  
+5. Chen Runjia (Rudy)  s
 
 ---
 
