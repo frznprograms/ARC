@@ -11,7 +11,7 @@ from typing import Dict
 # Adjust if needed
 from fasttext_classifier import FasttextClassifier
 
-def get_fasttext_model():
+def get_fasttext():
 
     # Load environment variables from .env
     load_dotenv()
@@ -35,3 +35,12 @@ def get_fasttext_model():
     clf = FasttextClassifier(categories=active_categories, model_dir=Path(model_path))
     return clf
 
+# label, fired = clf.predict_or_gate(
+#     text,
+#     default_threshold=None,
+#     threshold_per_head=None,
+#     return_triggering_heads=True,
+# )
+
+# result = {"label": label, "fired_heads": fired, "disabled_heads": "spam"}
+# print(json.dumps(result, ensure_ascii=False, indent=2))
