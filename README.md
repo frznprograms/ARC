@@ -3,11 +3,36 @@
 
 ### Authors
 
-1. Soo Weng Kit
-2. Tian Fengyao (Kyrie)
-3. Lee Chun Wayne
-4. Shane Vivek Bharathan
-5. Chen Runjia (Rudy)
+1. Soo Weng Kit  
+2. Tian Fengyao (Kyrie)  
+3. Lee Chun Wayne  
+4. Shane Vivek Bharathan  
+5. Chen Runjia (Rudy)  
+
+---
+
+### Project Overview
+### Project Overview
+
+This project tackles the challenge of distinguishing between trustworthy and untrustworthy reviews. Our approach combines machine learning and deep learning models in an ensemble framework. By stacking these models in ascending order of computational cost, the system can quickly filter obvious spam with lightweight models, while reserving more expensive deep learning methods for the harder cases. This layered strategy amortizes the overall cost of prediction, ensuring both efficiency and accuracy in filtering reviews.
+
+
+---
+
+### Setup Instructions
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+---
+
+### How to Reproduce Results
+*(To be added)*
+
+---
 
 ### Citations
 
@@ -68,19 +93,7 @@ url = {https://doi.org/10.7910/DVN/ANGOX0}
 }
 ```
 
-#### Twitter Toxic Comments Dataset
+### Twitter Toxic Comments Dataset
 ```
 https://www.kaggle.com/datasets/mrmorj/hate-speech-and-offensive-language-dataset?utm_source=chatgpt.com
-```
-
-#### Jigsaw Dataet
-Please note that this dataset is **NOT** to be used for reproduction or commerical purposes. We have used it here for academic purposes in accordance with the usage policy prescribed by Jigsaw.
-```
-@misc{jigsaw-toxic-comment-classification-challenge,
-    author = {cjadams and Jeffrey Sorensen and Julia Elliott and Lucas Dixon and Mark McDonald and nithum and Will Cukierski},
-    title = {Toxic Comment Classification Challenge},
-    year = {2017},
-    howpublished = {\url{https://kaggle.com/competitions/jigsaw-toxic-comment-classification-challenge}},
-    note = {Kaggle}
-}
 ```
