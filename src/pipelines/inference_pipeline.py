@@ -31,7 +31,12 @@ class InferencePipeline:
         )
         self.encoder = self._load_encoder()
 
-    def run_inference(self, review: dict[str, Any]):
+    @logger.catch(message="Unable to complete inference for review.", reraise=True)
+    def run_inference(self, review_and_metdata: dict[str, Any]) -> int:
+        review = review_and_metdata.get("review", None)
+        if review is None:
+            logger.error("Review is empty.")
+
         safe_value = self.safety_model.predict(review)
         pred_strength = self.safety_model.predict_proba(review)[:, 1]
         if safe_value > 0:
@@ -39,7 +44,7 @@ class InferencePipeline:
                 f"The review did not pass the saftey check with probabilit {pred_strength}, \
                     and has been flagged for rejection."
             )
-            return safe_value
+            return 1
 
         self.fasttext_model.predict(
             review
@@ -61,6 +66,7 @@ class InferencePipeline:
         )
         return 3
 
+    @logger.catch(message="Unable to load encoder.", reraise=True)
     def _load_encoder(self):
         if not os.path.exists(self.encoder_model_path):
             from huggingface_hub import hf_hub_download
