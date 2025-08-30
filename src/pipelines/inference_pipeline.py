@@ -14,7 +14,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from transformers import logging as hf_logging
 
 from src.fasttext.fasttext_classifier import FasttextClassifier
-from src.utils.base_helpers import suppress_stdout_stderr
+from src.utils.base_helpers import suppress_stdout_stderr, timed_execution
 
 load_dotenv()
 # Get token from environment
@@ -48,6 +48,7 @@ class InferencePipeline:
         self.encoder = self._load_encoder()
         logger.success("Loaded encoder model for Stage 3 checks.")
 
+    @timed_execution
     @logger.catch(message="Unable to complete inference for review.", reraise=True)
     def run_inference(
         self,
@@ -130,7 +131,7 @@ class InferencePipeline:
             num_labels=4,
             problem_type="multi_label_classification",
         )
-        logger.success("Loaded base model.")
+        logger.success("Loaded base encoder model.")
 
         # create LORA model structure first
         lora_config = LoraConfig(
