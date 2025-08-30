@@ -47,7 +47,14 @@ uv pip install -r requirements.txt
 
 ### How to Reproduce Results
 
-We have created several scripts to allow 
+We have created several scripts (both .py and .sh) to allow users to run inference with our pipeline. In this README, we will cover the usage of the overarching inference pipeline, which is the culmination of all our work. For more details on how to run each of the components, please refer to the "sub-READMEs" in `src/encoder`, `src/fasttext` and `src/safety`. For now, here are instructions on how to run inference, for which the Python script is located in `src/pipelines/inference_pipeline.py`.
+
+**Please make sure you run this from root. Unless otherwise stated, our scripts were all meant to be run from root so that users don't have to keep navigating between folders.**
+
+```bash
+uv run -m src.pipelines.inference_pipeline
+```
+
 
 ---
 
