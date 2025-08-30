@@ -4,7 +4,7 @@ import json
 import os
 import pandas as pd
 from openai import OpenAI
-
+import glob
 
 class MessageInfo(BaseModel):
     spam: str
@@ -108,10 +108,119 @@ class BatchProcess():
     
     def write_to_file(self, batch_jds:List, row_checkpoint, batch_no) -> None:
             row_checkpoint -= 1
-            dir_name = "extracted_jds"
+            dir_name = "extracted_labels"
             os.makedirs(dir_name, exist_ok=True)
 
-            filename = f"{dir_name}/batch_{batch_no}_row_{row_checkpoint}_extracted_jd.json"
+            filename = f"{dir_name}/batch_{batch_no}_row_{row_checkpoint}_extracted_labels.json"
 
             with open(filename, "w") as f:
                 json.dump(batch_jds, f, indent=4) 
+
+
+system_message = '''
+  <task>
+    Analyze Google reviews to gauge review quality by detecting problematic content.
+  </task>
+  
+  <detection_criteria>
+    <spam>Detect reviews that are fake, duplicate, or artificially generated</spam>
+    <advertisement>Detect reviews that primarily promote other businesses or services</advertisement>
+    <irrelevant_content>Detect reviews that don't relate to the actual business or location</irrelevant_content>
+    <non_visitor_rant>Detect rants from users who likely never visited the location</non_visitor_rant>
+    <toxicity>Detect reviews containing rudeness, racism, hate speech, harassment, or other toxic behavior</toxicity>
+  </detection_criteria>
+  
+  <labeling_instructions>
+    Label each detection category with 1 if the issue is present, 0 if not present.
+  </labeling_instructions>
+  
+  <input_format>
+    Review text will be provided for analysis.
+  </input_format>
+  
+  <response_format>
+    {
+      "spam": 0 or 1,
+      "advertisement": 0 or 1, 
+      "irrelevant_content": 0 or 1,
+      "non_visitor_rant": 0 or 1,
+      "toxicity": 0 or 1
+    }
+  </response_format>
+  
+  <example>
+    Input: "This place is terrible! I heard from my friend it's dirty and overpriced. Never going there!"
+    Output: {"spam": 0, "advertisement": 0, "irrelevant_content": 0, "non_visitor_rant": 1, "toxicity": 0}
+  </example>
+'''
+
+
+if __name__ == "__main__":
+
+    """
+    this script loads in the preprocessed user messages and gets the LLM to generate labels for it, it also combines the json files into a csv
+    """
+
+    # load in the dataset to be labelled
+    df = pd.read_csv("data/preprocessed_reviews.csv")
+
+    # shuffle and sample
+    shuffled_df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+    # get the client
+    client = OpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+
+    # initialise the batch process object to label the data
+    batch = BatchProcess(shuffled_df, 0, 0, system_message, client)
+
+    # start the labelling, 500 batches of 20
+    batch.process(500, 20)
+
+    # get all json files in the folder
+    json_files = glob.glob("extracted_labels/*.json")
+
+    combined_data = []
+
+    for file in json_files:
+        with open(file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                combined_data.extend(data)   # merge lists
+            else:
+                combined_data.append(data)   # append objects
+
+    # save into one file
+    with open("combined.json", "w", encoding="utf-8") as f:
+        json.dump(combined_data, f, indent=2, ensure_ascii=False)
+
+    # conver this to a dataframe
+    combined_data_df = pd.DataFrame(combined_data)
+    # rename the column 
+    combined_data_df = combined_data_df.rename(columns={"job_id": "id"})
+
+    # incase we didnt finish labelling all the data, do a left join with the original dataset
+    labeled_final = pd.merge(combined_data_df, shuffled_df, on="id", how="left")
+
+    # keep only the relevant columns
+    labeled_final = labeled_final[[
+        "user_message", 
+        "spam", 
+        "advertisement", 
+        "irrelevant_content", 
+        "non_visitor_rant", 
+        "toxicity"
+    ]]
+
+    # rename them for clarity
+    df = df.rename(columns={
+        "user_message": "text",
+        "irrelevant_content": "relevance",
+        "non_visitor_rant": "rant"
+    })
+
+
+    # save the final labelled dataset
+    labeled_final.to_csv("data/real_review_dataset_final_cleaned.csv", index=False, encoding="utf-8")
