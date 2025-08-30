@@ -21,6 +21,22 @@ class Messages(BaseModel):
 
 
 class BatchProcess:
+    """
+    A class to handle batch processing of job descriptions (JDs) with an LLM.
+
+    This class:
+    - Extracts raw JDs from a DataFrame in batches.
+    - Sends the data to an LLM for structured parsing.
+    - Appends job IDs to the structured outputs.
+    - Writes the results to JSON files.
+
+    Attributes:
+        df (pd.DataFrame): Input dataframe containing job data.
+        start_index (int): Row index of the DataFrame to start processing from.
+        batch_start_number (int): Starting batch number.
+        system_message (str): Instruction/system prompt for the LLM.
+        client (OpenAI): OpenAI client used to call the LLM.
+        """
     def __init__(
         self,
         df: pd.DataFrame,
@@ -30,8 +46,14 @@ class BatchProcess:
         client: OpenAI,
     ):
         """
-        prepares raw jd from df, sends it to llms and writes outputs to json
+        Initializes the BatchProcess with required data and parameters.
 
+        Args:
+            df (pd.DataFrame): DataFrame containing job descriptions and IDs.
+            start_index (int): Row index in the DataFrame to begin processing.
+            batch_start_number (int): Batch number to start with.
+            system_message (str): System message (prompt) to provide to the LLM.
+            client (OpenAI): OpenAI client for making LLM API requests.
         """
         self.df = df
         self.start_index = start_index  # index of the dataframe to START
@@ -40,6 +62,18 @@ class BatchProcess:
         self.client = client
 
     def process(self, no_of_batches: int, batch_size: int) -> None:
+        """
+        Iterates through the DataFrame in batches, prepares inputs for the LLM,
+        processes responses, and writes outputs to JSON files.
+
+        Args:
+            no_of_batches (int): Number of batches to process.
+            batch_size (int): Number of job descriptions per batch.
+
+        Raises:
+            ValueError: If the number of outputs from the LLM does not match
+                        the number of job descriptions in a batch.
+        """
         # prepare the messages in the batch
         for i in range(no_of_batches):
             print(f"Processing batch {i}...")
@@ -77,8 +111,22 @@ class BatchProcess:
         self, df: pd.DataFrame, checkpoint: int, batch_size: int
     ) -> tuple[str, List[int], int]:
         """
-        This function iterates through the rows in the dataframe in that batch and prepares multiple raw JDs into one message/string for the llm
-        returns the updated checkpoint, input prompt which is a string and the list of their job ids for addition later
+        Prepares batched job descriptions into a formatted string for LLM input.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing job data.
+            checkpoint (int): Starting index in the DataFrame for the batch.
+            batch_size (int): Number of job descriptions to include in the batch.
+
+        Returns:
+            tuple[str, List[int], int]:
+                - A formatted string containing the batched job descriptions.
+                - A list of job IDs corresponding to the batch.
+                - The updated checkpoint (row index after this batch).
+
+        Raises:
+            ValueError: If the number of job IDs collected does not match
+                        the expected batch size.
         """
         messages = ""
         job_ids = []
@@ -101,7 +149,14 @@ class BatchProcess:
         self, system_message: str, user_message: str
     ) -> Messages:
         """
-        sends the messages to gemini, returns a Messages object
+        Sends the batch input to the LLM and retrieves structured responses.
+
+        Args:
+            system_message (str): System-level prompt for guiding the LLM.
+            user_message (str): Formatted string containing job descriptions.
+
+        Returns:
+            Messages: Parsed structured LLM response wrapped in a Messages object.
         """
         response = self.client.beta.chat.completions.parse(
             model="gemini-2.0-flash-lite",
@@ -115,6 +170,16 @@ class BatchProcess:
 
     # we need to append the job ids to each message, saves output to json file
     def append_jb_ids(self, job_ids: List, messages_list: Messages) -> List:
+        """
+        Appends job IDs to each structured LLM response.
+
+        Args:
+            job_ids (List): List of job IDs corresponding to the batch.
+            messages_list (Messages): LLM output containing structured messages.
+
+        Returns:
+            List: List of structured responses with job IDs appended.
+        """
         batch_jds = []
         for idx, message in enumerate(messages_list.messages):
             temp = message.model_dump()
@@ -125,6 +190,19 @@ class BatchProcess:
         return batch_jds
 
     def write_to_file(self, batch_jds: List, row_checkpoint, batch_no) -> None:
+        """
+        Writes structured job description outputs to a JSON file.
+
+        Args:
+            batch_jds (List): List of structured job descriptions with job IDs.
+            row_checkpoint (int): Last row index processed in the DataFrame.
+            batch_no (int): Batch number for naming the output file.
+
+        Side Effects:
+            Creates a directory `extracted_labels/` (if not exists).
+            Writes a JSON file in the format:
+            `batch_<batch_no>_row_<row_checkpoint>_extracted_labels.json`.
+        """
         row_checkpoint -= 1
         dir_name = "extracted_labels"
         os.makedirs(dir_name, exist_ok=True)
