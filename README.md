@@ -3,7 +3,7 @@
 
 ### Authors
 
-1. Soo Weng Kit  
+1. Soo Weng Kit 
 2. Tian Fengyao (Kyrie)  
 3. Lee Chun Wayne  
 4. Shane Vivek Bharathan  
@@ -20,16 +20,34 @@ This project tackles the challenge of distinguishing between trustworthy and unt
 
 ### Setup Instructions
 
+For this project we used the `uv` package manager, which is efficient and easy to use. Please install `uv` to get started. For more instructions on installing `uv` for your system, please refer to this link: https://docs.astral.sh/uv/getting-started/installation/
+
+To support large file storage, please also install Git Large File Storage (LFS) using the following command: 
+
+```bash
+git lfs install
+```
+
+To initialise the virtual environment, follow these steps: 
+
 ```bash
 uv venv
 source .venv/bin/activate
-uv pip install -e .
+uv sync
+```
+For those who prefer to use a `requirements.txt`, we have you covered as well. Simply run these commands instead: 
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
 ---
 
 ### How to Reproduce Results
-*(To be added)*
+
+We have created several scripts to allow 
 
 ---
 

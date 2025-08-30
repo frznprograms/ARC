@@ -338,7 +338,6 @@ Actual   POS    732     2
 ```
 - **Precision**: 100.00% (732/732)
 - **Recall**: 99.73% (732/734)
-- **Performance**: Excellent - near-perfect classification
 
 **Ad Detection**
 ```
@@ -350,7 +349,6 @@ Actual   POS    251     4
 ```
 - **Precision**: 99.60% (251/252)
 - **Recall**: 98.43% (251/255)
-- **Performance**: Excellent - very high accuracy
 
 **Irrelevant Content Detection**
 ```
@@ -362,7 +360,6 @@ Actual   POS    210    13
 ```
 - **Precision**: 99.53% (210/211)
 - **Recall**: 94.17% (210/223)
-- **Performance**: Very good - slightly lower recall
 
 **Rant Detection**
 ```
@@ -374,7 +371,6 @@ Actual   POS     42     7
 ```
 - **Precision**: 89.36% (42/47)
 - **Recall**: 85.71% (42/49)
-- **Performance**: Good - lowest performance due to small sample size
 
 **Unsafe Content Detection**
 ```
@@ -386,7 +382,6 @@ Actual   POS    313    31
 ```
 - **Precision**: 95.43% (313/328)
 - **Recall**: 90.99% (313/344)
-- **Performance**: Very good - balanced precision and recall
 
 #### Technical Notes
 
