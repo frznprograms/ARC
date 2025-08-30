@@ -1,37 +1,56 @@
-import os
-
-import pandas as pd
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from loguru import logger
+from src.pipelines.inference_pipeline import InferencePipeline
+from io import StringIO
 
 app = FastAPI()
-CSV_FILE = "reviews.csv"
+
+# Allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-class Review(BaseModel):
-    name: str
-    category: str
-    description: str
-    review: str
-    rating: int
+# Review schema
+class ReviewRequest(BaseModel):
+    review: dict
 
 
-@app.post("/submit_review/")
-def submit_review(review: Review):
-    data = review.model_dump()
+# Capture logs in memory
+log_stream = StringIO()
+logger.remove()
+logger.add(log_stream, format="{level} | {message}", level="SUCCESS")
+logger.add(log_stream, format="{level} | {message}", level="WARNING")
 
-    prompt = f"""
-    Business Name: {data["name"]}
-    Category: {data["category"]}
-    Description: {data["description"]}
-    Review: {data["review"]}
-    Rating: {data["rating"]}
-    """
+# Load pipeline once
+pipeline = InferencePipeline(safety_model_path="models/safety-model-test.pkl")
 
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
-        df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-    else:
-        df = pd.DataFrame([data])
-    df.to_csv(CSV_FILE, index=False)
-    return {"status": prompt}
+
+@app.post("/analyze_review/")
+async def analyze_review(request: ReviewRequest):
+    # Reset logs
+    log_stream.seek(0)
+    log_stream.truncate(0)
+
+    try:
+        pipeline.run_inference(request.review)
+        logger.success("Inference completed successfully.")
+    except Exception as e:
+        logger.warning(f"Pipeline error: {e}")
+
+    # Collect logs
+    log_stream.seek(0)
+    logs = []
+    for line in log_stream.readlines():
+        if line.startswith("SUCCESS"):
+            logs.append({"type": "success", "message": line.strip()})
+        elif line.startswith("WARNING"):
+            logs.append({"type": "warning", "message": line.strip()})
+
+    return {"logs": logs[1:]}

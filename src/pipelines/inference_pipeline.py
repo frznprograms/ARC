@@ -55,6 +55,7 @@ class InferencePipeline:
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
     ) -> int:
+        stage = 1
         review = review_and_metdata.get("review", None)
         if review is None:
             logger.error("Review is empty.")
@@ -67,8 +68,9 @@ class InferencePipeline:
             logger.warning(
                 f"The review did not pass the saftey check with probability {pred_strength}, and has therefore been rejected."
             )
-            return 1
+            return stage
 
+        stage += 1
         # fasttext section, stage 2
         prompt = f"""
             Business Name: {review_and_metdata["name"]}
@@ -88,11 +90,12 @@ class InferencePipeline:
             logger.warning(
                 f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
             )
-            return 2
+            return stage
         else:
-            logger.success("Review was accepted!")
+            logger.success(f"Review was accepted at stage {stage}!")
 
         # encoder section, stage 3
+        stage += 1
         inputs = self.tokenizer(
             prompt, return_tensors="pt", truncation=True, padding=True, max_length=512
         )
@@ -105,12 +108,12 @@ class InferencePipeline:
         final_pred_val = torch.max(preds, dim=0)
         final_pred_accept = "Accept" if final_pred_val == 0 else "Reject"
         if final_pred_accept:
-            logger.success("Review was accepted!")
+            logger.success(f"Review was accepted at stage {stage}!")
         else:
             logger.info(
                 f"Final prediction after 3 stages is {final_pred_accept} with probability {probs}."
             )
-        return 3
+        return stage
 
     @logger.catch(message="Unable to load encoder.", reraise=True)
     def _load_encoder(self):
