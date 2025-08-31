@@ -44,6 +44,8 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
+Please also create a huggingface token and place it in your .env file.
+
 ---
 
 ### How to Reproduce Results
