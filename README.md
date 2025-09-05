@@ -1,14 +1,14 @@
 <h1 style="text-align: center;">ARC - Automated Review Checking with Machine Learning</h1>
-by Rudy's Rangers, for TikTok TechJam 2025
+by Rudy's Rangers, for TikTok TechJam 2025 *FINALS*
 <h3 style="text-align: center;">Chosen Problem Statment: Filtering the Noise: ML for Trustworthy Location Reviews</h2>
 
 ### Authors
 
-1. Soo Weng Kit 
-2. Tian Fengyao (Kyrie)  
-3. Lee Chun Wayne  
-4. Shane Vivek Bharathan  
-5. Chen Runjia (Rudy)  s
+1. Soo Weng Kit
+2. Tian Fengyao (Kyrie)
+3. Lee Chun Wayne
+4. Shane Vivek Bharathan
+5. Chen Runjia (Rudy) s
 
 ---
 
@@ -16,27 +16,27 @@ by Rudy's Rangers, for TikTok TechJam 2025
 
 This project tackles the challenge of distinguishing between trustworthy and untrustworthy reviews. Our approach combines machine learning and deep learning models in an ensemble framework. By stacking these models in ascending order of computational cost, the system can quickly filter obvious spam with lightweight models, while reserving more expensive deep learning methods for the harder cases. This layered strategy amortizes the overall cost of prediction, ensuring both efficiency and accuracy in filtering reviews.
 
-
 ---
 
 ### Setup Instructions
 
-For this project we used the `uv` package manager, which is efficient and easy to use. Please install `uv` to get started. For more instructions on installing `uv` for your system, please refer to this link: https://docs.astral.sh/uv/getting-started/installation/
+For this project we used the `uv` package manager, which is efficient and easy to use. Please install `uv` to get started. For more instructions on installing `uv` for your system, please refer to this link: <https://docs.astral.sh/uv/getting-started/installation/>
 
-To support large file storage, please also install Git Large File Storage (LFS) using the following command: 
+To support large file storage, please also install Git Large File Storage (LFS) using the following command:
 
 ```bash
 git lfs install
 ```
 
-To initialise the virtual environment, follow these steps: 
+To initialise the virtual environment, follow these steps:
 
 ```bash
 uv venv
 source .venv/bin/activate
 uv sync
 ```
-For those who prefer to use a `requirements.txt`, we have you covered as well. Simply run these commands instead: 
+
+For those who prefer to use a `requirements.txt`, we have you covered as well. Simply run these commands instead:
 
 ```bash
 uv venv
@@ -56,27 +56,28 @@ We have created several scripts (both .py and .sh) to allow users to run inferen
 uv run -m src.pipelines.inference_pipeline
 ```
 
-Alternatively, for those who prefer to configure entirely in command line, you can run: 
+Alternatively, for those who prefer to configure entirely in command line, you can run:
 
 ```bash
 ./run.sh
-``` 
+```
+
 from root. Below is a decscription of the possible args you can configure:
 
-| Argument        | Type  | Required | Default                         | Description                                                  |
-|-----------------|-------|----------|---------------------------------|--------------------------------------------------------------|
-| `--safety-model` | str   | No       | `models/safety-model-test.pkl`  | Path to the safety model `.pkl` file                         |
-| `--encoder-model` | str   | No       | `lora_sft_encoder.pth`          | Path to encoder model weights (`.pth`)                       |
-| `--review-file`  | str   | No       | `data/for_model/review_1.json`  | Path to JSON review file (with name, category, description, review, rating) |
-| `--threshold`    | float | No       | `0.7`                           | Threshold for fasttext heads                                 |
+| Argument          | Type  | Required | Default                        | Description                                                                 |
+| ----------------- | ----- | -------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `--safety-model`  | str   | No       | `models/safety-model-test.pkl` | Path to the safety model `.pkl` file                                        |
+| `--encoder-model` | str   | No       | `lora_sft_encoder.pth`         | Path to encoder model weights (`.pth`)                                      |
+| `--review-file`   | str   | No       | `data/for_model/review_1.json` | Path to JSON review file (with name, category, description, review, rating) |
+| `--threshold`     | float | No       | `0.7`                          | Threshold for fasttext heads                                                |
 
 **Note**: the pipeline was designed to take only one review (i.e. one dictionary) at a time. This was a specific design choice, as logically reviews should be evaluated the moment they are posted, not after some time until enough samples are curated for batched inference. We have taken care to ensure our pipeline is **efficient** at inference for each sample.
 
 ---
 
-### Sample Web Application 
+### Sample Web Application
 
-We have included a minimal web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Please note it is not exactly what the real implementation will look like, as in real life users will not need to manually enter the name of the place they are reviewing, description, etc. These are things that need to be extracted by developers. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root: 
+We have included a minimal web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Please note it is not exactly what the real implementation will look like, as in real life users will not need to manually enter the name of the place they are reviewing, description, etc. These are things that need to be extracted by developers. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root:
 
 ```bash
 # launch app
@@ -87,17 +88,18 @@ And simply close the tab in your browser or press `Ctrl + c` to terminate.
 
 ### Performance
 
-Our pipeline components performed quite well as isolated components. You may refer to the model performance metrics included in the "sub-READMEs" in `src/encoder`, `src/fasttext` and `src/safety` for more details. 
+Our pipeline components performed quite well as isolated components. You may refer to the model performance metrics included in the "sub-READMEs" in `src/encoder`, `src/fasttext` and `src/safety` for more details.
 
 For your own tests, we have included 3 sample reviews in `json` format, which you can find under `data/for_model`. Feel free to use those in our web app, and you can even play around with small word misspellings, or censors.
 
 ### Trigger Warning
 
-To aid our model implementation, which utilises a lexicon-based component, we have included a set of toxic words under `src/utils/toxic_lexicon.py`, which can be offensive to some. 
+To aid our model implementation, which utilises a lexicon-based component, we have included a set of toxic words under `src/utils/toxic_lexicon.py`, which can be offensive to some.
 
 ### Citations
 
 #### FastText
+
 ```
 @article{bojanowski2017enriching,
   title={Enriching Word Vectors with Subword Information},
@@ -131,12 +133,14 @@ To aid our model implementation, which utilises a lexicon-based component, we ha
 }
 ```
 
-#### Google Maps Dataset 
+#### Google Maps Dataset
+
 ```
 https://www.kaggle.com/datasets/denizbilginn/google-maps-restaurant-reviews
 ```
 
 #### Internet Violence Study (InViS) Dataset
+
 ```
 @data{DVN/ANGOX0_2025,
 author = {Golbeck, Jen},
@@ -150,6 +154,7 @@ url = {https://doi.org/10.7910/DVN/ANGOX0}
 ```
 
 #### ToxiGen Dataset
+
 ```
 @inproceedings{hartvigsen2022toxigen,
   title={ToxiGen: A Large-Scale Machine-Generated Dataset for Implicit and Adversarial Hate Speech Detection},
@@ -160,6 +165,7 @@ url = {https://doi.org/10.7910/DVN/ANGOX0}
 ```
 
 ### Twitter Toxic Comments Dataset
+
 ```
 https://www.kaggle.com/datasets/mrmorj/hate-speech-and-offensive-language-dataset?utm_source=chatgpt.com
 ```
