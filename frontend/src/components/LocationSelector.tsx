@@ -125,6 +125,7 @@ const createDescription = (name?: string, vicinity?: string) => {
 export default function LocationSelector({ location, onLocationChange, searchValue, onSearchValueChange }: LocationSelectorProps) {
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [lastClickTime, setLastClickTime] = useState<number>(0);
 
   const onLoad = (autocomplete: google.maps.places.Autocomplete) => {
     setAutocomplete(autocomplete);
@@ -132,6 +133,13 @@ export default function LocationSelector({ location, onLocationChange, searchVal
 
   const onMapLoad = (mapInstance: google.maps.Map) => {
     setMap(mapInstance);
+    
+    // Disable default info windows by adding click listener
+    mapInstance.addListener('click', (event: google.maps.MapMouseEvent) => {
+      // Close any open info windows
+      const infoWindow = new google.maps.InfoWindow();
+      infoWindow.close();
+    });
   };
 
   const onPlaceChanged = () => {
@@ -156,15 +164,22 @@ export default function LocationSelector({ location, onLocationChange, searchVal
 
   const handleMapClick = (event: google.maps.MapMouseEvent) => {
     if (event.latLng && map) {
+      // Debounce clicks to reduce API calls (prevent rapid clicking)
+      const now = Date.now();
+      if (now - lastClickTime < 1000) { // 1 second cooldown
+        return;
+      }
+      setLastClickTime(now);
+
       const lat = event.latLng.lat();
       const lng = event.latLng.lng();
       const clickedLocation = { lat, lng };
       
-      // Search for nearby places within 100m radius
+      // Search for nearby places within 25m radius
       const service = new google.maps.places.PlacesService(map);
       const request: google.maps.places.PlaceSearchRequest = {
         location: clickedLocation,
-        radius: 100, // 100 meters
+        radius: 25, // 25 meters - much more precise
         type: 'establishment' // Only businesses/establishments
       };
       
@@ -192,15 +207,10 @@ export default function LocationSelector({ location, onLocationChange, searchVal
           }
         }
         
-        // No actual businesses found - fall back to reverse geocoding
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ location: clickedLocation }, (results, status) => {
-          if (status === 'OK' && results?.[0]) {
-            const placeName = results[0].formatted_address;
-            onLocationChange({ lat, lng, name: placeName }, '', ''); // Clear category and description
-            onSearchValueChange(placeName);
-          }
-        });
+        // No businesses found - just use coordinates without geocoding API call
+        const placeName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        onLocationChange({ lat, lng, name: placeName }, '', '');
+        onSearchValueChange(placeName);
       });
     }
   };
@@ -241,14 +251,32 @@ export default function LocationSelector({ location, onLocationChange, searchVal
             options={{
               styles: darkMapStyles,
               disableDefaultUI: true,
-              zoomControl: false,
+              zoomControl: true,
               streetViewControl: false,
               mapTypeControl: false,
               fullscreenControl: false,
-              mapTypeId: 'roadmap'
+              mapTypeId: 'roadmap',
+              maxZoom: 21,
+              minZoom: 11,
+              scrollwheel: true,
+              restriction: {
+                latLngBounds: {
+                  north: 1.48,
+                  south: 1.20,
+                  west: 103.58,
+                  east: 104.08
+                },
+                strictBounds: true
+              }
             }}
           >
-            {location && <Marker position={location} />}
+            {location && <Marker 
+              position={location} 
+              options={{ 
+                clickable: false,
+                draggable: false 
+              }}
+            />}
           </GoogleMap>
         </div>
       </LoadScript>
