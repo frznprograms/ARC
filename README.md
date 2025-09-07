@@ -76,16 +76,40 @@ from root. Below is a decscription of the possible args you can configure:
 
 ---
 
-### Sample Web Application 
+### Web Applications
 
-We have included a minimal web application for users to play around with, just to get an idea of what our implementation is meant to do, and how it can serve as a dynamic review evaluator. Please note it is not exactly what the real implementation will look like, as in real life users will not need to manually enter the name of the place they are reviewing, description, etc. These are things that need to be extracted by developers. Feel free to launch the app and play around with the reviews, locations, and descriptions, to see how the pipeline checks reviews. Once again, from root: 
+We have included two web applications for testing the ARC review analysis system:
+
+#### 1. Streamlit App (Basic)
+Simple web interface for basic testing:
 
 ```bash
-# launch app
+# Launch Streamlit app
 ./launch_app.sh
 ```
 
-And simply close the tab in your browser or press `Ctrl + c` to terminate.
+#### 2. React Frontend (Advanced) 
+Modern React/Next.js application with Google Maps integration:
+
+```bash
+# Launch React app with backend
+./launch_react_app.sh
+```
+
+**React Frontend Features:**
+- 🗺️ Interactive Google Maps with location picker
+- 🔍 Smart business search and auto-complete
+- 📝 Auto-fill category and description for recognised businesses
+- 🎨 Professional dark theme UI
+- 📱 Responsive design
+- ⚡ Real-time form validation
+
+**Requirements for React Frontend:**
+- Node.js >=18.18.0
+- Google Maps API key (Maps JavaScript API, Places API, Geocoding API)
+- See `frontend/README.md` for detailed setup instructions
+
+Both applications connect to the same FastAPI backend for ML analysis. The React frontend provides a more polished user experience with smart location detection.
 
 ### Performance
 
