@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import redis
 import joblib
 import torch
 from dotenv import load_dotenv
@@ -36,12 +37,19 @@ class InferencePipeline:
 
     safety_model_path: str = "models/safety-model-test.pkl"
     encoder_model_path: str = "lora_sft_encoder.pth"
+    redis_port: int = 6379
 
     def __post_init__(self):
         """
         Initializes the pipeline by loading the models and setting up configurations.
         """
         hf_logging.set_verbosity_error()
+        logger.info("Connecting to Redis...")
+        self.redis = redis.Redis(host='localhost', port=self.redis_port, db=0)
+        self.redis.set("safety_stage", 0)
+        self.redis.set("fasttext_stage", 0)
+        self.redis.set("encoder_stage", 0)
+
         logger.info("Loading models...")
         self.safety_model = joblib.load(self.safety_model_path)
         logger.success("Loaded safety model for Stage 1 checks.")
@@ -81,6 +89,7 @@ class InferencePipeline:
             ValueError: If the review is empty or missing.
         """
         stage = 1
+        self.redis.incr("safety_stage")
         review = review_and_metdata.get("review", None)
         if review is None:
             logger.error("Review is empty.")
@@ -97,6 +106,7 @@ class InferencePipeline:
 
         stage += 1
         # fasttext section, stage 2
+        self.redis.incr("fasttext_stage")
         prompt = f"""
             Business Name: {review_and_metdata["name"]}
             Category: {review_and_metdata["category"]}
@@ -122,6 +132,7 @@ class InferencePipeline:
             )
 
         # encoder section, stage 3
+        self.redis.incr("encoder_stage")
         stage += 1
         inputs = self.tokenizer(
             prompt, return_tensors="pt", truncation=True, padding=True, max_length=512

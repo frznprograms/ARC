@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
