@@ -26,10 +26,21 @@ if not hf_token:
 
 @dataclass
 class InferencePipeline:
+    """
+    A pipeline for running multi-stage inference on reviews using various models.
+
+    Attributes:
+        safety_model_path (str): Path to the safety model file.
+        encoder_model_path (str): Path to the encoder model file.
+    """
+
     safety_model_path: str = "models/safety-model-test.pkl"
     encoder_model_path: str = "lora_sft_encoder.pth"
 
     def __post_init__(self):
+        """
+        Initializes the pipeline by loading the models and setting up configurations.
+        """
         hf_logging.set_verbosity_error()
         logger.info("Loading models...")
         self.safety_model = joblib.load(self.safety_model_path)
@@ -55,6 +66,20 @@ class InferencePipeline:
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
     ) -> int:
+        """
+        Runs the inference pipeline on a given review and metadata.
+
+        Args:
+            review_and_metdata (dict[str, Any]): A dictionary containing the review and its metadata.
+                Expected keys include 'review', 'name', 'category', 'description', and 'rating'.
+            default_threshold (float): The default threshold for classification decisions. Defaults to 0.7.
+
+        Returns:
+            int: The stage at which the review was rejected or the final stage if accepted.
+
+        Raises:
+            ValueError: If the review is empty or missing.
+        """
         stage = 1
         review = review_and_metdata.get("review", None)
         if review is None:
@@ -121,6 +146,15 @@ class InferencePipeline:
 
     @logger.catch(message="Unable to load encoder.", reraise=True)
     def _load_encoder(self):
+        """
+        Loads the encoder model with LoRA configuration.
+
+        Returns:
+            torch.nn.Module: The loaded encoder model.
+
+        Raises:
+            FileNotFoundError: If the encoder model file is not found.
+        """
         if not os.path.exists(self.encoder_model_path):
             from huggingface_hub import hf_hub_download
 
@@ -182,6 +216,9 @@ class InferencePipeline:
 
 
 if __name__ == "__main__":
+    """
+    Main entry point for running the inference pipeline on sample reviews.
+    """
     ip = InferencePipeline(safety_model_path="models/safety-model-test.pkl")
 
     reviews = []

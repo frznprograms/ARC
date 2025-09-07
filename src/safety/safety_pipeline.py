@@ -18,11 +18,29 @@ from src.utils.toxic_lexicon import toxic_lexicon
 
 @dataclass
 class SafetyPipeline:
+    """
+    A pipeline for training and evaluating a safety model to classify text as safe or unsafe.
+
+    Attributes:
+        data (pd.DataFrame): The input data containing text and labels.
+        data_prepared (bool): A flag indicating whether the data has been split into training and testing sets.
+        seed (int): The random seed for reproducibility.
+    """
+
     data: pd.DataFrame = field(default_factory=pd.DataFrame)
     data_prepared: bool = False
     seed: int = 42
 
     def create_pipeline(self):
+        """
+        Creates a machine learning pipeline with TF-IDF features and lexicon-based features,
+        followed by a logistic regression classifier.
+
+        The pipeline includes:
+        - TF-IDF vectorization of text data.
+        - Lexicon-based feature extraction using a predefined toxic lexicon.
+        - Logistic regression for classification.
+        """
         tfidf = TfidfVectorizer()
         features = FeatureUnion(
             [
@@ -46,6 +64,21 @@ class SafetyPipeline:
         cv: int = 3,
         test_size: float = 0.25,
     ):
+        """
+        Trains the pipeline using GridSearchCV to find the best hyperparameters.
+
+        Args:
+            param_grid (dict): The hyperparameter grid for GridSearchCV.
+            save_name (str): The name of the file to save the trained model. Defaults to "experiment_default.csv".
+            cv (int): The number of cross-validation folds. Defaults to 3.
+            test_size (float): The proportion of the dataset to include in the test split. Defaults to 0.25.
+
+        Returns:
+            GridSearchCV: The fitted GridSearchCV object.
+
+        Raises:
+            Exception: If the training process fails.
+        """
         if not self.data_prepared:
             self.prepare_data(test_size=test_size)
 
@@ -74,6 +107,18 @@ class SafetyPipeline:
     @timed_execution
     @logger.catch(message="Unable to finish evaluating pipeline.", reraise=True)
     def eval_pipeline(self, threshold: float = 0.5):
+        """
+        Evaluates the trained pipeline on the test data.
+
+        Args:
+            threshold (float): The decision threshold for classification. Defaults to 0.5.
+
+        Returns:
+            tuple: A tuple containing the classification report (str) and accuracy (float).
+
+        Raises:
+            Exception: If the evaluation process fails.
+        """
         logger.info("Now evaluating, please do not interrupt...")
         y_pred_prob = self.pipeline.predict_proba(self.X_test)[:, 1]
         y_pred = (y_pred_prob >= threshold).astype(int)
@@ -88,6 +133,15 @@ class SafetyPipeline:
 
     @logger.catch(message="Unable to prepare train-test split.")
     def prepare_data(self, test_size: float = 0.25):
+        """
+        Prepares the data by splitting it into training and testing sets.
+
+        Args:
+            test_size (float): The proportion of the dataset to include in the test split. Defaults to 0.25.
+
+        Raises:
+            Exception: If the data preparation process fails.
+        """
         X, y = self.data["text"], self.data["unsafe_label"]
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             X, y, test_size=test_size, random_state=self.seed, stratify=y
@@ -96,16 +150,6 @@ class SafetyPipeline:
 
 
 if __name__ == "__main__":
-    # combined_data = prepare_safety_datasets(
-    #     jigsaw_path="data/raw/toxicity/jigsaw.csv",
-    #     jigsaw_save_path="data/cleaned/trial/jigsaw_clean.csv",
-    #     toxigen_save_path="data/cleaned/trial/toxiegn_clean.csv",
-    #     twitter_path="data/raw/toxicity/twitter.csv",
-    #     twitter_save_path="data/cleaned/trial/twitter.csv",
-    # )
-    # combined_data.to_csv("data/for_model/combined_safety_data.csv", index=False)
-    #
-
     param_grid = read_json_safety_config(
         json_config_path="src/configs/safety_config.json"
     )

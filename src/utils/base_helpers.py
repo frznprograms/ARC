@@ -23,6 +23,22 @@ def prepare_safety_datasets(
     twitter_path: str,
     twitter_save_path: str,
 ) -> pd.DataFrame:
+    """
+    Prepares and combines safety-related datasets from multiple sources.
+
+    Args:
+        jigsaw_path (str): Path to the Jigsaw dataset file.
+        jigsaw_save_path (str): Path to save the preprocessed Jigsaw dataset.
+        toxigen_save_path (str): Path to save the preprocessed Toxigen dataset.
+        twitter_path (str): Path to the Twitter dataset file.
+        twitter_save_path (str): Path to save the preprocessed Twitter dataset.
+
+    Returns:
+        pd.DataFrame: A combined DataFrame containing preprocessed data from all sources.
+
+    Raises:
+        Exception: If any of the preprocessing steps fail.
+    """
     jigsaw = JigsawProcessor(file_path=jigsaw_path).preprocess(jigsaw_save_path)
     toxigen = ToxigenProcessor(file_path=None).preprocess(toxigen_save_path)
     twitter = TwitterProcessor(file_path=twitter_path).preprocess(twitter_save_path)
@@ -38,6 +54,19 @@ def prepare_safety_datasets(
 def read_json_safety_config(
     json_config_path: str = "src/configs/safety_config.json",
 ) -> dict[str, Any]:
+    """
+    Reads and processes a JSON configuration file for training.
+
+    Args:
+        json_config_path (str): Path to the JSON configuration file. Defaults to "src/configs/safety_config.json".
+
+    Returns:
+        dict[str, Any]: A dictionary containing the processed configuration parameters.
+
+    Raises:
+        FileNotFoundError: If the JSON configuration file is not found.
+        Exception: If the JSON file cannot be parsed or processed.
+    """
     logger.info("Now reading json configuration for training...")
 
     with open(json_config_path, "r") as f:
@@ -61,6 +90,18 @@ def read_json_safety_config(
 
 @logger.catch(message="Unable to set_device.", reraise=True)
 def set_device(device_type: str = "auto") -> str:
+    """
+    Sets the device for computation based on availability and user preference.
+
+    Args:
+        device_type (str): The preferred device type ("auto", "cuda", "mps", or "cpu"). Defaults to "auto".
+
+    Returns:
+        str: The device type that was set ("cuda", "mps", or "cpu").
+
+    Raises:
+        ValueError: If the specified device type cannot be assigned.
+    """
     device = None
     if device_type == "auto":
         if torch.cuda.is_available():
@@ -98,6 +139,19 @@ def set_device(device_type: str = "auto") -> str:
 
 @logger.catch(message="Unable to set seed for this run/experiment.", reraise=True)
 def set_seeds(seed_num: Optional[int], deterministic: bool = True) -> int:
+    """
+    Sets the random seed for reproducibility.
+
+    Args:
+        seed_num (Optional[int]): The seed number to set. If None, defaults to 42.
+        deterministic (bool): Whether to enable deterministic behavior. Defaults to True.
+
+    Returns:
+        int: The seed number that was set.
+
+    Raises:
+        Exception: If the seed-setting process fails.
+    """
     if seed_num is None:
         logger.warning("A seed was not detected. Setting seed to 42.")
         seed_num = 42
@@ -115,6 +169,16 @@ def set_seeds(seed_num: Optional[int], deterministic: bool = True) -> int:
 
 
 def timed_execution(func):
+    """
+    A decorator to measure and log the execution time of a function.
+
+    Args:
+        func (Callable): The function to be wrapped.
+
+    Returns:
+        Callable: The wrapped function with execution time logging.
+    """
+
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
         result = func(*args, **kwargs)
@@ -135,6 +199,17 @@ def timed_execution(func):
 
 @contextmanager
 def suppress_stdout_stderr():
+    """
+    A context manager to suppress standard output and error streams.
+
+    Usage:
+        with suppress_stdout_stderr():
+            # Code that produces unwanted output
+            ...
+
+    Yields:
+        None
+    """
     with open(os.devnull, "w") as devnull:
         old_stdout, old_stderr = sys.stdout, sys.stderr
         sys.stdout, sys.stderr = devnull, devnull
