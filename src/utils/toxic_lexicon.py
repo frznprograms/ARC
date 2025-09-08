@@ -27,4 +27,6 @@ toxic_lexicon = {
     "coon",
     "fk",
     "bij",
+    "fuckk",
+    "mfker",
 }

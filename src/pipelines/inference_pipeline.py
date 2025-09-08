@@ -118,11 +118,11 @@ class InferencePipeline:
                 f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
             )
             return stage
-        
+
         # Early acceptance logic: check if all fasttext heads show low confidence
         fasttext_results = self.fasttext_model.predict_all_heads(prompt)
         max_positive_confidence = max(fasttext_results.values())
-        
+
         if max_positive_confidence <= early_accept_threshold:
             logger.info(
                 f"Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3."

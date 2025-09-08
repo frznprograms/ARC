@@ -6,6 +6,7 @@ from loguru import logger
 from src.pipelines.inference_pipeline import InferencePipeline
 from io import StringIO
 import json
+import re
 import asyncio
 
 app = FastAPI()
@@ -65,84 +66,97 @@ async def analyze_review_stream(request: ReviewRequest):
         try:
             yield f"data: {json.dumps({'stage': 1, 'status': 'starting', 'message': 'Starting safety check...'})}\n\n"
             await asyncio.sleep(0.1)  # Small delay for UI
-            
+
             # Stage 1: Safety check
             review_data = request.review
             review = review_data.get("review", None)
+            review = re.sub(r"\b(they|they're|them|up)\b", "", review, flags=re.IGNORECASE)  # type: ignore
+            # remove extra spaces
+            review = re.sub(r"\s+", " ", review).strip()
+
             if review is None:
                 yield f"data: {json.dumps({'stage': 1, 'status': 'error', 'message': 'Review is empty'})}\n\n"
                 return
-            
+
             if isinstance(review, str):
                 review = [review]
-            
+
             safe_value = pipeline.safety_model.predict(review)
             pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
-            
+
             if safe_value > 0:
                 yield f"data: {json.dumps({'stage': 1, 'status': 'rejected', 'message': f'Review failed safety check (probability: {pred_strength[0]:.3f})'})}\n\n"
                 return
             else:
                 yield f"data: {json.dumps({'stage': 1, 'status': 'passed', 'message': 'Safety check passed'})}\n\n"
-            
+
             await asyncio.sleep(0.2)
-            
+
             # Stage 2: Fasttext check
             yield f"data: {json.dumps({'stage': 2, 'status': 'starting', 'message': 'Running fasttext classification...'})}\n\n"
             await asyncio.sleep(0.1)
-            
+
             prompt = f"""
                 Business Name: {review_data["name"]}
                 Category: {review_data["category"]}
                 Description: {review_data["description"]}
                 Review: {review_data["review"]}
                 Rating: {review_data["rating"]}
-            """.replace("\n", "").strip()
-            
+            """.replace(
+                "\n", ""
+            ).strip()
+
             label, fired = pipeline.fasttext_model.predict_or_gate(
                 prompt,
                 default_threshold=0.7,
                 return_triggering_heads=True,
             )
-            
+
             if label == "bad":
                 yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {fired}'})}\n\n"
                 return
             else:
                 yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext classification passed'})}\n\n"
-            
+
             await asyncio.sleep(0.2)
-            
+
             # Stage 3: Encoder check
             yield f"data: {json.dumps({'stage': 3, 'status': 'starting', 'message': 'Running encoder model...'})}\n\n"
             await asyncio.sleep(0.1)
-            
+
             inputs = pipeline.tokenizer(
-                prompt, return_tensors="pt", truncation=True, padding=True, max_length=512
+                prompt,
+                return_tensors="pt",
+                truncation=True,
+                padding=True,
+                max_length=512,
             )
-            
+
             import torch
+
             with torch.no_grad():
                 outputs = pipeline.encoder(**inputs)
                 probs = torch.sigmoid(outputs.logits)
                 preds = (probs > 0.5).int()
-            
+
             # Check if any prediction is positive (rejected)
             has_positive_pred = torch.any(preds > 0).item()
-            
+
             # Get prediction scores for each bucket for console logging
             scores = probs.squeeze().tolist()
-            bucket_names = ['ad', 'irrelevant', 'rant', 'unsafe']
-            score_details = {bucket_names[i]: round(scores[i], 3) for i in range(len(scores))}
-            
+            bucket_names = ["ad", "irrelevant", "rant", "unsafe"]
+            score_details = {
+                bucket_names[i]: round(scores[i], 3) for i in range(len(scores))
+            }
+
             if not has_positive_pred:
                 yield f"data: {json.dumps({'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details})}\n\n"
             else:
                 yield f"data: {json.dumps({'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder (max probability: {probs.max().item():.3f})', 'scores': score_details})}\n\n"
-            
+
         except Exception as e:
             yield f"data: {json.dumps({'stage': -1, 'status': 'error', 'message': f'Pipeline error: {str(e)}'})}\n\n"
-    
+
     return StreamingResponse(
         generate_stream(),
         media_type="text/plain",
@@ -150,5 +164,5 @@ async def analyze_review_stream(request: ReviewRequest):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Content-Type": "text/event-stream",
-        }
+        },
     )
