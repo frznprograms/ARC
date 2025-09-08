@@ -159,9 +159,9 @@ To aid our model implementation, which utilises a lexicon-based component, we ha
 }
 ```
 
-#### Google Maps Dataset
-
+#### Google Maps Datasets
 ```
+https://mcauleylab.ucsd.edu/public_datasets/gdrive/googlelocal/
 https://www.kaggle.com/datasets/denizbilginn/google-maps-restaurant-reviews
 ```
 
