@@ -8,16 +8,16 @@ echo "🚀 Starting ARC React Frontend & Backend..."
 
 # Function to kill background processes on exit
 cleanup() {
-    echo -e "\n🛑 Shutting down servers..."
-    if [[ ! -z $BACKEND_PID ]]; then
-        kill $BACKEND_PID 2>/dev/null
-        echo "✅ Backend stopped"
-    fi
-    if [[ ! -z $FRONTEND_PID ]]; then
-        kill $FRONTEND_PID 2>/dev/null
-        echo "✅ Frontend stopped"
-    fi
-    exit 0
+  echo -e "\n🛑 Shutting down servers..."
+  if [[ ! -z $BACKEND_PID ]]; then
+    kill $BACKEND_PID 2>/dev/null
+    echo "✅ Backend stopped"
+  fi
+  if [[ ! -z $FRONTEND_PID ]]; then
+    kill $FRONTEND_PID 2>/dev/null
+    echo "✅ Frontend stopped"
+  fi
+  exit 0
 }
 
 # Set up trap to call cleanup function on script exit
@@ -25,13 +25,13 @@ trap cleanup EXIT INT TERM
 
 # Activate virtual environment if exists
 if [[ -d ".venv" ]]; then
-    echo "📦 Activating virtual environment..."
-    source .venv/bin/activate
+  echo "📦 Activating virtual environment..."
+  source .venv/bin/activate
 fi
 
 # Start FastAPI backend in background
 echo "🔧 Starting FastAPI backend..."
-uvicorn src.app.backend:app --host 127.0.0.1 --port 8000 --reload &
+uv run uvicorn src.app.backend:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start
@@ -59,3 +59,4 @@ echo "Press Ctrl+C to stop both servers..."
 
 # Keep script running and wait for user interrupt
 wait
+
