@@ -125,3 +125,24 @@ class FasttextClassifier:
             return decide_one(texts)
         else:
             return [decide_one(t) for t in texts]
+
+    def predict_all_heads(self, text: str) -> Dict[str, float]:
+        """
+        Get confidence scores from all heads for a single text.
+        
+        Args:
+            text (str): Input text to classify
+            
+        Returns:
+            Dict[str, float]: Dictionary mapping category names to their positive confidence scores
+        """
+        results = {}
+        for cat, head in self.heads.items():
+            labels, probs = head.predict_raw(text, k=1)
+            # Get the probability of the positive label
+            if labels and labels[0] == head.positive_label:
+                results[cat] = probs[0]
+            else:
+                # If negative label is predicted, positive confidence is 1 - negative_prob
+                results[cat] = 1.0 - probs[0] if probs else 0.0
+        return results
