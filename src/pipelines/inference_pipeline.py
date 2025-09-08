@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import redis
 import joblib
 import torch
 from dotenv import load_dotenv
-from huggingface_hub import snapshot_download
+from huggingface_hub import snapshot_download, hf_hub_download
 from loguru import logger
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -16,7 +17,8 @@ from transformers import logging as hf_logging
 from src.fasttext.fasttext_classifier import FasttextClassifier
 from src.utils.base_helpers import suppress_stdout_stderr, timed_execution
 
-load_dotenv()
+load_dotenv(override=True)
+
 # Get token from environment
 hf_token = os.getenv("HF_HUB_TOKEN")
 
@@ -36,13 +38,37 @@ class InferencePipeline:
 
     safety_model_path: str = "models/safety-model-test.pkl"
     encoder_model_path: str = "lora_sft_encoder.pth"
+    banned_ids_path: str = "redis_data/banned_ids.json"
+    redis_port: int = 6379
+    # need to modify this id
+    user_id = 123
 
     def __post_init__(self):
         """
         Initializes the pipeline by loading the models and setting up configurations.
         """
         hf_logging.set_verbosity_error()
-        logger.info("Loading models...")
+        logger.info("Connecting to Redis...")
+        self.redis = redis.Redis(host='localhost', port=self.redis_port, db=0)
+        
+        # Test the connection
+        if not self.redis.ping():
+            raise redis.ConnectionError("Ping failed")
+        
+        self.redis.set("safety_stage", 0)
+        self.redis.set("fasttext_stage", 0)
+        self.redis.set("encoder_stage", 0)
+
+        # Read JSON file
+        with open(self.banned_ids_path, "r", encoding="utf-8") as f:
+            data = json.load(f)   
+
+        # Iterate through key-value pairs and insert into Redis
+        for key, value in data.items():
+            self.redis.set(key, value)   # store as string (Redis default)
+
+        logger.info("Redis data loaded")
+
         self.safety_model = joblib.load(self.safety_model_path)
         logger.success("Loaded safety model for Stage 1 checks.")
 
@@ -65,7 +91,7 @@ class InferencePipeline:
         self,
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
-        early_accept_threshold: float = 0.3,
+        early_accept_threshold: float = 0.3
     ) -> int:
         """
         Runs the inference pipeline on a given review and metadata.
@@ -82,7 +108,18 @@ class InferencePipeline:
         Raises:
             ValueError: If the review is empty or missing.
         """
+        stage = 0
+        value = self.redis.get(self.user_id)
+        if value:
+            value = value.decode("utf-8")  # convert bytes
+            if int(value) == -1:           # compare as integer
+                logger.warning(
+                    "This user has been flagged for reviews that did not pass our pipeline in the past"
+                )
+                return stage
+            
         stage = 1
+        self.redis.incr("safety_stage")
         review = review_and_metdata.get("review", None)
         if review is None:
             logger.error("Review is empty.")
@@ -95,10 +132,12 @@ class InferencePipeline:
             logger.warning(
                 f"The review did not pass the saftey check with probability {pred_strength}, and has therefore been rejected."
             )
+            self.add_banned_ids(self.user_id)
             return stage
 
         stage += 1
         # fasttext section, stage 2
+        self.redis.incr("fasttext_stage")
         prompt = f"""
             Business Name: {review_and_metdata["name"]}
             Category: {review_and_metdata["category"]}
@@ -117,6 +156,7 @@ class InferencePipeline:
             logger.warning(
                 f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
             )
+            self.add_banned_ids(self.user_id)
             return stage
 
         # Early acceptance logic: check if all fasttext heads show low confidence
@@ -137,6 +177,7 @@ class InferencePipeline:
             )
 
         # encoder section, stage 3
+        self.redis.incr("encoder_stage")
         stage += 1
         inputs = self.tokenizer(
             prompt, return_tensors="pt", truncation=True, padding=True, max_length=512
@@ -149,7 +190,7 @@ class InferencePipeline:
         # since prediction is just one value
         final_pred_val = torch.max(preds, dim=0)
         final_pred_accept = "Accept" if final_pred_val == 0 else "Reject"
-        if final_pred_accept:
+        if not final_pred_val:
             logger.success(
                 f"Review was accepted at stage {stage} and passed all policies!"
             )
@@ -170,15 +211,11 @@ class InferencePipeline:
         Raises:
             FileNotFoundError: If the encoder model file is not found.
         """
-        if not os.path.exists(self.encoder_model_path):
-            from huggingface_hub import hf_hub_download
-
-            lora_weights_path = hf_hub_download(
-                repo_id="dolphin-in-teal-lake/sft-encoder",
-                filename="lora_sft_encoder.pth",
-            )
-        else:
-            lora_weights_path = self.encoder_model_path
+        lora_weights_path = hf_hub_download(
+            repo_id="dolphin-in-teal-lake/sft-encoder",
+            filename="lora_sft_encoder.pth",
+            token=hf_token
+        )
 
         # load base model
         self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased")
@@ -228,7 +265,20 @@ class InferencePipeline:
         model.eval()
 
         return model
-
+    
+    def add_banned_ids(self, user_id):
+        """
+        Increment the counter for a user_id in Redis.
+        If counter reaches 3, set value to -1 (flagged).
+        """
+        key = str(user_id)
+        
+        # Increment counter atomically (creates key with value 1 if not exists)
+        count = self.redis.incr(key)
+        
+        # If counter reaches 3, set to -1
+        if count >= 3:
+            self.redis.set(key, -1)
 
 if __name__ == "__main__":
     """

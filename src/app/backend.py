@@ -68,6 +68,7 @@ async def analyze_review_stream(request: ReviewRequest):
             await asyncio.sleep(0.1)  # Small delay for UI
 
             # Stage 1: Safety check
+            pipeline.redis.incr("safety_stage")
             review_data = request.review
             review = review_data.get("review", None)
             review = re.sub(r"\b(they|they're|them|up)\b", "", review, flags=re.IGNORECASE)  # type: ignore
@@ -77,7 +78,15 @@ async def analyze_review_stream(request: ReviewRequest):
             if review is None:
                 yield f"data: {json.dumps({'stage': 1, 'status': 'error', 'message': 'Review is empty'})}\n\n"
                 return
-
+            value = pipeline.redis.get(pipeline.user_id)
+            if value:
+                value = value.decode("utf-8")  # convert bytes
+                if int(value) == -1:           # compare as integer
+                    logger.warning(
+                        "This user has been flagged for reviews that did not pass our pipeline in the past"
+                    )
+                    yield "This user has been flagged for reviews that did not pass our pipeline in the past"
+                    return   
             if isinstance(review, str):
                 review = [review]
 
@@ -85,6 +94,7 @@ async def analyze_review_stream(request: ReviewRequest):
             pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
 
             if safe_value > 0:
+                pipeline.add_banned_ids(pipeline.user_id)
                 yield f"data: {json.dumps({'stage': 1, 'status': 'rejected', 'message': f'Review failed safety check (probability: {pred_strength[0]:.3f})'})}\n\n"
                 return
             else:
@@ -93,6 +103,7 @@ async def analyze_review_stream(request: ReviewRequest):
             await asyncio.sleep(0.2)
 
             # Stage 2: Fasttext check
+            pipeline.redis.incr("fasttext_stage")
             yield f"data: {json.dumps({'stage': 2, 'status': 'starting', 'message': 'Running fasttext classification...'})}\n\n"
             await asyncio.sleep(0.1)
 
@@ -113,6 +124,7 @@ async def analyze_review_stream(request: ReviewRequest):
             )
 
             if label == "bad":
+                pipeline.add_banned_ids(pipeline.user_id)
                 yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {fired}'})}\n\n"
                 return
             else:
@@ -121,6 +133,7 @@ async def analyze_review_stream(request: ReviewRequest):
             await asyncio.sleep(0.2)
 
             # Stage 3: Encoder check
+            pipeline.redis.incr("encoder_stage")
             yield f"data: {json.dumps({'stage': 3, 'status': 'starting', 'message': 'Running encoder model...'})}\n\n"
             await asyncio.sleep(0.1)
 
@@ -152,6 +165,7 @@ async def analyze_review_stream(request: ReviewRequest):
             if not has_positive_pred:
                 yield f"data: {json.dumps({'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details})}\n\n"
             else:
+                pipeline.add_banned_ids(pipeline.user_id)
                 yield f"data: {json.dumps({'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder (max probability: {probs.max().item():.3f})', 'scores': score_details})}\n\n"
 
         except Exception as e:

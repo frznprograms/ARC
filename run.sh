@@ -3,7 +3,7 @@ set -e
 
 # If no args given → run with defaults
 if [ $# -eq 0 ]; then
-  source .venv/bin/activate
+  source .venv/Scripts/activate
   python main.py
 else
   # Forward all args directly to main.py
