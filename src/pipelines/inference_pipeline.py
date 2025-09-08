@@ -91,8 +91,7 @@ class InferencePipeline:
         self,
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
-        early_accept_threshold: float = 0.3,
-        early_accept_threshold: float = 0.3,
+        early_accept_threshold: float = 0.3
     ) -> int:
         """
         Runs the inference pipeline on a given review and metadata.
