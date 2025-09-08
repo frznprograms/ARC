@@ -68,3 +68,5 @@ coverage.xml
 data.csv
 
 extracted_labels/*
+
+launch_react_app.sh

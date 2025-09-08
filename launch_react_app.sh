@@ -26,7 +26,7 @@ trap cleanup EXIT INT TERM
 # Activate virtual environment if exists
 if [[ -d ".venv" ]]; then
     echo "📦 Activating virtual environment..."
-    source .venv/bin/activate
+    source .venv/Scripts/activate
 fi
 
 # Start FastAPI backend in background
