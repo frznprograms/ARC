@@ -143,6 +143,7 @@ class SafetyPipeline:
             Exception: If the data preparation process fails.
         """
         X, y = self.data["text"], self.data["unsafe_label"]
+
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             X, y, test_size=test_size, random_state=self.seed, stratify=y
         )

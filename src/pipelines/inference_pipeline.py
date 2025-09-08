@@ -92,6 +92,7 @@ class InferencePipeline:
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
         early_accept_threshold: float = 0.3,
+        early_accept_threshold: float = 0.3,
     ) -> int:
         """
         Runs the inference pipeline on a given review and metadata.
@@ -158,11 +159,11 @@ class InferencePipeline:
             )
             self.add_banned_ids(self.user_id)
             return stage
-        
+
         # Early acceptance logic: check if all fasttext heads show low confidence
         fasttext_results = self.fasttext_model.predict_all_heads(prompt)
         max_positive_confidence = max(fasttext_results.values())
-        
+
         if max_positive_confidence <= early_accept_threshold:
             logger.info(
                 f"Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3."
