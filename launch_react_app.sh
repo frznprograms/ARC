@@ -25,8 +25,8 @@ trap cleanup EXIT INT TERM
 
 # Activate virtual environment if exists
 if [[ -d ".venv" ]]; then
-    echo "📦 Activating virtual environment..."
-    source .venv/Scripts/activate
+  echo "📦 Activating virtual environment..."
+  source .venv/bin/activate
 fi
 
 # Start FastAPI backend in background
@@ -59,4 +59,3 @@ echo "Press Ctrl+C to stop both servers..."
 
 # Keep script running and wait for user interrupt
 wait
-

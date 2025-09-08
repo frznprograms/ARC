@@ -15,7 +15,7 @@ interface ReviewData {
 
 interface StageUpdate {
   stage: number;
-  status: 'starting' | 'passed' | 'rejected' | 'error';
+  status: 'starting' | 'passed' | 'rejected' | 'error' | 'banned';
   message: string;
 }
 
@@ -40,6 +40,11 @@ export default function ReviewAnalyzer() {
   const [searchValue, setSearchValue] = useState('');
   const [currentStage, setCurrentStage] = useState<number>(0);
   const [stageUpdates, setStageUpdates] = useState<StageUpdate[]>([]);
+  const [stageCounters, setStageCounters] = useState({
+    safety_stage: 0,
+    fasttext_stage: 0,
+    encoder_stage: 0
+  });
 
   const handleLocationChange = (newLocation: MapLocation | null, category: string, description: string) => {
     setLocation(newLocation);
@@ -49,6 +54,18 @@ export default function ReviewAnalyzer() {
       category,
       description
     }));
+  };
+
+  const fetchStageCounters = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/stage_counters/');
+      if (response.ok) {
+        const counters = await response.json();
+        setStageCounters(counters);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stage counters:', error);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -61,6 +78,9 @@ export default function ReviewAnalyzer() {
     setError(null);
     setCurrentStage(0);
     setStageUpdates([]);
+    
+    // Fetch initial counters
+    await fetchStageCounters();
 
     try {
       const response = await fetch('http://127.0.0.1:8000/analyze_review_stream/', {
@@ -119,6 +139,8 @@ export default function ReviewAnalyzer() {
       setError(`Connection error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
+      // Fetch updated counters after analysis
+      await fetchStageCounters();
     }
   };
 
@@ -130,6 +152,8 @@ export default function ReviewAnalyzer() {
       case 'rejected':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'banned':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       default:
         return <Clock className="w-5 h-5 text-gray-400" />;
@@ -144,6 +168,8 @@ export default function ReviewAnalyzer() {
         return 'border-red-500 bg-red-900/20 text-red-200';
       case 'error':
         return 'border-red-500 bg-red-900/20 text-red-200';
+      case 'banned':
+        return 'border-red-500 bg-red-900/20 text-red-200';
       case 'starting':
         return 'border-blue-500 bg-blue-900/20 text-blue-200';
       default:
@@ -157,6 +183,15 @@ export default function ReviewAnalyzer() {
       case 2: return 'Fasttext Classification';
       case 3: return 'Encoder Analysis';
       default: return 'Unknown Stage';
+    }
+  };
+
+  const getStageCounter = (stage: number) => {
+    switch (stage) {
+      case 1: return stageCounters.safety_stage;
+      case 2: return stageCounters.fasttext_stage;
+      case 3: return stageCounters.encoder_stage;
+      default: return 0;
     }
   };
 
@@ -281,7 +316,7 @@ export default function ReviewAnalyzer() {
                   // Get the LATEST update for this stage (not the first one)
                   const stageUpdates_forStage = stageUpdates.filter(u => u.stage === stage);
                   const stageUpdate = stageUpdates_forStage[stageUpdates_forStage.length - 1];
-                  const isCompleted = stageUpdate && ['passed', 'rejected', 'error'].includes(stageUpdate.status);
+                  const isCompleted = stageUpdate && ['passed', 'rejected', 'error', 'banned'].includes(stageUpdate.status);
                   const isCurrentlyProcessing = currentStage === stage && isAnalyzing && !isCompleted;
                   
                   // Determine the icon to show
@@ -303,7 +338,12 @@ export default function ReviewAnalyzer() {
                     >
                       {icon}
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{getStageTitle(stage)}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-sm">{getStageTitle(stage)}</div>
+                          <div className="text-xs opacity-60">
+                            {getStageCounter(stage)} runs
+                          </div>
+                        </div>
                         {stageUpdate && stageUpdate.message && (
                           <div className="text-xs mt-1 opacity-80">{stageUpdate.message}</div>
                         )}
@@ -321,8 +361,19 @@ export default function ReviewAnalyzer() {
                 {(() => {
                   const finalUpdate = stageUpdates[stageUpdates.length - 1];
                   const allPassed = stageUpdates.filter(u => u.status === 'passed').length === 3;
-                  
-                  if (allPassed) {
+                  const bannedUpdate = stageUpdates.find(u => u.status === 'banned');
+                  if (bannedUpdate) {
+                    return (
+                      <div className="flex items-center gap-3 p-4 rounded-md border border-red-500 bg-red-900/20">
+                        <AlertCircle className="w-6 h-6 text-red-500" />
+                        <div>
+                          <div className="font-medium text-red-200">User Banned</div>
+                          <div className="text-sm text-red-300 mt-1">Account flagged for policy violations</div>
+                          <div className="text-xs text-red-400 mt-1">{bannedUpdate.message}</div>
+                        </div>
+                      </div>
+                    );
+                  } else if (allPassed) {
                     return (
                       <div className="flex items-center gap-3 p-4 rounded-md border border-green-500 bg-green-900/20">
                         <CheckCircle className="w-6 h-6 text-green-500" />

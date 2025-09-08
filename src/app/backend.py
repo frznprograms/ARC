@@ -60,6 +60,26 @@ async def analyze_review(request: ReviewRequest):
     return {"logs": logs[1:]}
 
 
+@app.get("/stage_counters/")
+async def get_stage_counters():
+    try:
+        safety_count = pipeline.redis.get("safety_stage")
+        fasttext_count = pipeline.redis.get("fasttext_stage") 
+        encoder_count = pipeline.redis.get("encoder_stage")
+        
+        return {
+            "safety_stage": int(safety_count.decode("utf-8")) if safety_count else 0,
+            "fasttext_stage": int(fasttext_count.decode("utf-8")) if fasttext_count else 0,
+            "encoder_stage": int(encoder_count.decode("utf-8")) if encoder_count else 0
+        }
+    except Exception as e:
+        return {
+            "safety_stage": 0,
+            "fasttext_stage": 0,
+            "encoder_stage": 0
+        }
+
+
 @app.post("/analyze_review_stream/")
 async def analyze_review_stream(request: ReviewRequest):
     async def generate_stream():
@@ -79,13 +99,14 @@ async def analyze_review_stream(request: ReviewRequest):
                 yield f"data: {json.dumps({'stage': 1, 'status': 'error', 'message': 'Review is empty'})}\n\n"
                 return
             value = pipeline.redis.get(pipeline.user_id)
+             
             if value:
                 value = value.decode("utf-8")  # convert bytes
                 if int(value) == -1:           # compare as integer
                     logger.warning(
                         "This user has been flagged for reviews that did not pass our pipeline in the past"
                     )
-                    yield "This user has been flagged for reviews that did not pass our pipeline in the past"
+                    yield f"data: {json.dumps({'stage': 0, 'user_id': value, 'status': 'banned', 'message': 'This user has been flagged for reviews that did not pass our pipeline in the past'})}\n\n"
                     return   
             if isinstance(review, str):
                 review = [review]
@@ -129,6 +150,15 @@ async def analyze_review_stream(request: ReviewRequest):
                 return
             else:
                 yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext classification passed'})}\n\n"
+
+            # Early acceptance logic: check if all fasttext heads show low confidence
+            fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
+            max_positive_confidence = max(fasttext_results.values())
+            early_accept_threshold = 0.3
+
+            if max_positive_confidence <= early_accept_threshold:
+                yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': f'Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3. Review accepted!'})}\n\n"
+                return
 
             await asyncio.sleep(0.2)
 
