@@ -68,3 +68,4 @@ coverage.xml
 data.csv
 
 extracted_labels/*
+*.json

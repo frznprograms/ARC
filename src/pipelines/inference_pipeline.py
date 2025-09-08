@@ -65,6 +65,7 @@ class InferencePipeline:
         self,
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
+        early_accept_threshold: float = 0.3,
     ) -> int:
         """
         Runs the inference pipeline on a given review and metadata.
@@ -73,6 +74,7 @@ class InferencePipeline:
             review_and_metdata (dict[str, Any]): A dictionary containing the review and its metadata.
                 Expected keys include 'review', 'name', 'category', 'description', and 'rating'.
             default_threshold (float): The default threshold for classification decisions. Defaults to 0.7.
+            early_accept_threshold (float): The threshold for early acceptance if all fasttext heads show low confidence. Defaults to 0.3.
 
         Returns:
             int: The stage at which the review was rejected or the final stage if accepted.
@@ -116,9 +118,22 @@ class InferencePipeline:
                 f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
             )
             return stage
-        else:
+        
+        # Early acceptance logic: check if all fasttext heads show low confidence
+        fasttext_results = self.fasttext_model.predict_all_heads(prompt)
+        max_positive_confidence = max(fasttext_results.values())
+        
+        if max_positive_confidence <= early_accept_threshold:
+            logger.info(
+                f"Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3."
+            )
             logger.success(
                 f"Review was accepted at stage {stage} and passed all policies!"
+            )
+            return stage
+        else:
+            logger.info(
+                f"Max fasttext confidence {max_positive_confidence:.3f} > {early_accept_threshold}, proceeding to Stage 3."
             )
 
         # encoder section, stage 3
