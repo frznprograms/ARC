@@ -89,6 +89,7 @@ class SafetyPipeline:
             cv=cv,
             scoring="f1",
             n_jobs=-1,
+            verbose=3,  # display time taken and score
         )
         search.fit(self.X_train, self.y_train)
         self.pipeline = search.best_estimator_
@@ -157,7 +158,8 @@ if __name__ == "__main__":
 
     combined_data = pd.read_csv("data/for_model/combined_safety_data.csv")
     combined_data.dropna(inplace=True)
+    combined_data.drop_duplicates(inplace=True)
     sp = SafetyPipeline(data=combined_data)
     sp.create_pipeline()
-    sp.train_pipeline(param_grid=param_grid, save_name="safety-model-test.pkl")
+    sp.train_pipeline(param_grid=param_grid, save_name="safety-model-test-1.pkl")
     sp.eval_pipeline()
