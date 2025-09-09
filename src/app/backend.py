@@ -149,7 +149,7 @@ async def analyze_review_stream(request: ReviewRequest):
                 yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {fired}'})}\n\n"
                 return
             else:
-                yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext classification passed'})}\n\n"
+                yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext confidence within uncertain range'})}\n\n"
 
             # Early acceptance logic: check if all fasttext heads show low confidence
             fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
@@ -196,7 +196,17 @@ async def analyze_review_stream(request: ReviewRequest):
                 yield f"data: {json.dumps({'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details})}\n\n"
             else:
                 pipeline.add_banned_ids(pipeline.user_id)
-                yield f"data: {json.dumps({'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder (max probability: {probs.max().item():.3f})', 'scores': score_details})}\n\n"
+                # Find which labels triggered rejection
+                failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[i] > 0]
+                max_prob_idx = probs.argmax().item()
+                primary_label = bucket_names[max_prob_idx]
+                
+                if len(failed_labels) == 1:
+                    reject_reason = f"'{primary_label}' (probability: {probs.max().item():.3f})"
+                else:
+                    reject_reason = f"'{primary_label}' and {len(failed_labels)-1} other(s) (max probability: {probs.max().item():.3f})"
+                
+                yield f"data: {json.dumps({'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder for {reject_reason}', 'scores': score_details})}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'stage': -1, 'status': 'error', 'message': f'Pipeline error: {str(e)}'})}\n\n"
