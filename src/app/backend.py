@@ -99,7 +99,7 @@ async def analyze_review_stream(request: ReviewRequest):
                 yield f"data: {json.dumps({'stage': 1, 'status': 'error', 'message': 'Review is empty'})}\n\n"
                 return
             value = pipeline.redis.get(pipeline.user_id)
-             
+
             if value:
                 value = value.decode("utf-8")  # convert bytes
                 if int(value) == -1:           # compare as integer
@@ -107,14 +107,14 @@ async def analyze_review_stream(request: ReviewRequest):
                         "This user has been flagged for reviews that did not pass our pipeline in the past"
                     )
                     yield f"data: {json.dumps({'stage': 0, 'user_id': value, 'status': 'banned', 'message': 'This user has been flagged for reviews that did not pass our pipeline in the past'})}\n\n"
-                    return   
+                    return
             if isinstance(review, str):
                 review = [review]
 
             safe_value = pipeline.safety_model.predict(review)
             pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
 
-            if safe_value > 0:
+            if pred_strength > 0.8:
                 pipeline.add_banned_ids(pipeline.user_id)
                 yield f"data: {json.dumps({'stage': 1, 'status': 'rejected', 'message': f'Review failed safety check (probability: {pred_strength[0]:.3f})'})}\n\n"
                 return

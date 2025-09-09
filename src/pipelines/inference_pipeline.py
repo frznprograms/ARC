@@ -41,7 +41,7 @@ class InferencePipeline:
     banned_ids_path: str = "redis_data/banned_ids.json"
     redis_port: int = 6379
     # need to modify this id
-    user_id = 69
+    user_id = 169
 
     def __post_init__(self):
         """
@@ -277,7 +277,7 @@ class InferencePipeline:
         count = self.redis.incr(key)
         
         # If counter reaches 3, set to -1
-        if count >= 3:
+        if count >= 10:
             self.redis.set(key, -1)
 
 if __name__ == "__main__":
