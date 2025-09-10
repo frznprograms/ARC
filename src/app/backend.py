@@ -257,7 +257,6 @@ async def analyze_review_stream(request: ReviewRequest):
                 if message["status"] in {"rejected"}:
                     pipeline.add_banned_ids(value)
                     return
-                if message["status"] == "passed":
                 if message['status'] in {"rejected"}:
                     pipeline.add_banned_ids(pipeline.user_id)
                     return 
