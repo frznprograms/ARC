@@ -40,7 +40,7 @@ class InferencePipeline:
     banned_ids_path: str = "redis_data/banned_ids.json"
     redis_port: int = 6379
     # need to modify this id
-    user_id = 69
+    user_id = 4269
 
     def __post_init__(self):
         """

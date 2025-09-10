@@ -141,6 +141,11 @@ async def analyze_review_stream(request: ReviewRequest):
             fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
             thresholds = {"ad":0.9, "irrelevant":0.7, "rant": 0.7, "unsafe": 0.7}
             for cat, prob in fasttext_results.items():
+                if cat == "ad" and prob < thresholds[cat]:
+                    url_pattern = r'(?:https://[^\s]+|www\.[^\s]+|[^\s]+\.com(?:/[^\s]*)?)'
+                    match = re.search(url_pattern, review_data["review"])
+                    if match:
+                        prob = max(1, prob + 0.4)
                 # if any cat exceeds threshold, fail it
                 if prob > thresholds[cat]:
                     yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {cat}'})}\n\n"
