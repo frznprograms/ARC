@@ -22,7 +22,7 @@ def plot_lda():
     lda = LinearDiscriminantAnalysis(n_components=1)
 
     logger.info("Preparing LDA plot...")
-    X_lda = lda.fit_transform(X_tfidf.to_array(), labels)
+    X_lda = lda.fit_transform(X_tfidf.toarray(), labels)
 
     plt.hist(X_lda[labels == 0], alpha=0.6, label="Safe", bins=30)
     plt.hist(X_lda[labels == 1], alpha=0.6, label="Unsafe", bins=30)
