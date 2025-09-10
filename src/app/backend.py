@@ -267,8 +267,6 @@ async def analyze_review_stream(request: ReviewRequest):
             async for message in encoder_stage(prompt):
                 yield f"data: {json.dumps(message)}\n\n"
                 if message['status'] in {"rejected"}:
-                    print('hi')
-                    print(value)
                     pipeline.add_banned_ids(pipeline.user_id)
                     return             
 
