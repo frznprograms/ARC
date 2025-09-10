@@ -168,7 +168,7 @@ async def encoder_stage(prompt):
         yield {'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details}
     else:
         # Find which labels triggered rejection
-        failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[i] > 0]
+        failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[0, i] > 0]
         max_prob_idx = probs.argmax().item()
         primary_label = bucket_names[max_prob_idx]
         
@@ -187,7 +187,6 @@ async def analyze_review_stream(request: ReviewRequest):
         try:
             # check if the id is in the banned list
             value = pipeline.redis.get(pipeline.user_id)
-                
             if value:
                 value = value.decode("utf-8")  # convert bytes
                 if int(value) == -1:           # compare as integer
@@ -198,12 +197,12 @@ async def analyze_review_stream(request: ReviewRequest):
                     return   
             yield f"data: {json.dumps({'stage': 1, 'status': 'starting', 'message': 'Starting safety check...'})}\n\n"
             await asyncio.sleep(0.1)  # Small delay for UI
-    
+
             # stage 1
             async for message in safety_stage(review_data):
                 yield f"data: {json.dumps(message)}\n\n"
                 if message['status'] in {"error","rejected","banned"}:
-                    pipeline.add_banned_ids(value)
+                    pipeline.add_banned_ids(pipeline.user_id)
                     return 
                 
             prompt = f"""
@@ -220,7 +219,7 @@ async def analyze_review_stream(request: ReviewRequest):
             async for message in fasttext_stage(review_data,prompt):
                 yield f"data: {json.dumps(message)}\n\n"
                 if message['status'] in {"rejected"}:
-                    pipeline.add_banned_ids(value)
+                    pipeline.add_banned_ids(pipeline.user_id)
                     return 
                 if message['status'] == "passed":
                     return
@@ -229,7 +228,9 @@ async def analyze_review_stream(request: ReviewRequest):
             async for message in encoder_stage(prompt):
                 yield f"data: {json.dumps(message)}\n\n"
                 if message['status'] in {"rejected"}:
-                    pipeline.add_banned_ids(value)
+                    print('hi')
+                    print(value)
+                    pipeline.add_banned_ids(pipeline.user_id)
                     return             
 
         except Exception as e:

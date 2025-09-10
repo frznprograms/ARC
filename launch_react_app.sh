@@ -1,9 +1,13 @@
 #!/bin/bash
+set -e  # exit immediately if any command fails
 
 # Get the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+echo "Starting Redis using Docker"
+docker compose up -d
+ 
 echo "🚀 Starting ARC React Frontend & Backend..."
 
 # Function to kill background processes on exit
