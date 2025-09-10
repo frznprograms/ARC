@@ -153,6 +153,8 @@ export default function ReviewAnalyzer() {
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       case 'error':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'uncertain':
+        return <AlertCircle className="w-5 h-5 text-orange-500" />;
       case 'banned':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       default:
@@ -172,6 +174,8 @@ export default function ReviewAnalyzer() {
         return 'border-red-500 bg-red-900/20 text-red-200';
       case 'starting':
         return 'border-blue-500 bg-blue-900/20 text-blue-200';
+      case 'uncertain':
+        return 'border-orange-500 bg-orange-900/20 text-orange-200';
       default:
         return 'border-gray-600 bg-gray-800 text-gray-400';
     }
@@ -316,7 +320,7 @@ export default function ReviewAnalyzer() {
                   // Get the LATEST update for this stage (not the first one)
                   const stageUpdates_forStage = stageUpdates.filter(u => u.stage === stage);
                   const stageUpdate = stageUpdates_forStage[stageUpdates_forStage.length - 1];
-                  const isCompleted = stageUpdate && ['passed', 'rejected', 'error', 'banned'].includes(stageUpdate.status);
+                  const isCompleted = stageUpdate && ['passed', 'rejected', 'error', 'banned', 'uncertain'].includes(stageUpdate.status);
                   const isCurrentlyProcessing = currentStage === stage && isAnalyzing && !isCompleted;
                   
                   // Determine the icon to show
