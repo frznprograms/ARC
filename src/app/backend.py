@@ -138,28 +138,21 @@ async def analyze_review_stream(request: ReviewRequest):
                 "\n", ""
             ).strip()
 
-            label, fired = pipeline.fasttext_model.predict_or_gate(
-                prompt,
-                default_threshold=0.7,
-                return_triggering_heads=True,
-            )
-
-            if label == "bad":
-                pipeline.add_banned_ids(pipeline.user_id)
-                yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {fired}'})}\n\n"
-                return
-            else:
-                yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext confidence within uncertain range'})}\n\n"
-
-            # Early acceptance logic: check if all fasttext heads show low confidence
             fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
+            thresholds = {"ad":0.9, "irrelevant":0.7, "rant": 0.7, "unsafe": 0.7}
+            for cat, prob in fasttext_results.items():
+                # if any cat exceeds threshold, fail it
+                if prob > thresholds[cat]:
+                    yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {cat}'})}\n\n"
+                    return
+
             max_positive_confidence = max(fasttext_results.values())
             early_accept_threshold = 0.3
 
             if max_positive_confidence <= early_accept_threshold:
                 yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': f'Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3. Review accepted!'})}\n\n"
                 return
-
+            yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext confidence within uncertain range'})}\n\n"
             await asyncio.sleep(0.2)
 
             # Stage 3: Encoder check
