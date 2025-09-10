@@ -2,6 +2,8 @@ import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from loguru import logger
+
 from sklearn.decomposition import PCA
 
 
@@ -14,8 +16,10 @@ def plot_pca():
     tfidf_vec = safety_pipeline.named_steps["features"]["tfidf"]
 
     reviews, labels = combined_data["text"], combined_data["unsafe_label"]
+    logger.info("Preparing TF-IDF vector...")
     X_tfidf = tfidf_vec.transform(reviews)
 
+    logger.info("Preparing PCA plot...")
     X_pca = PCA(n_components=2).fit_transform(X_tfidf.toarray())
 
     plt.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap="coolwarm", alpha=0.6)

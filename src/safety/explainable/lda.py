@@ -2,6 +2,8 @@ import joblib
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from loguru import logger
+
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
@@ -14,10 +16,12 @@ def plot_lda():
     tfidf_vec = safety_pipeline.named_steps["features"]["tfidf"]
 
     reviews, labels = combined_data["text"], combined_data["unsafe_label"]
+    logger.info("Preparing TF-IDF vector...")
     X_tfidf = tfidf_vec.transform(reviews)
 
     lda = LinearDiscriminantAnalysis(n_components=1)
 
+    logger.info("Preparing LDA plot...")
     X_lda = lda.fit_transform(X_tfidf.to_array(), labels)
 
     plt.hist(X_lda[labels == 0], alpha=0.6, label="Safe", bins=30)
