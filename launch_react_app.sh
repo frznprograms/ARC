@@ -1,9 +1,13 @@
 #!/bin/bash
+set -e  # exit immediately if any command fails
 
 # Get the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+echo "Starting Redis using Docker"
+docker compose up -d
+ 
 echo "🚀 Starting ARC React Frontend & Backend..."
 
 # Function to kill background processes on exit
@@ -17,6 +21,9 @@ cleanup() {
     kill $FRONTEND_PID 2>/dev/null
     echo "✅ Frontend stopped"
   fi
+  # stop docker too
+  docker compose down >/dev/null 2>&1
+  echo "🐳 Docker stopped"
   exit 0
 }
 
@@ -27,7 +34,15 @@ trap cleanup EXIT INT TERM
 if [[ -d ".venv" ]]; then
   echo "📦 Activating virtual environment..."
   source .venv/bin/activate
+
+  echo "📦 Installing npm dependencies..."
+  npm install -g next
+  npm install @react-google-maps/api
 fi
+
+# Start Docker containers
+echo "🐳 Starting Docker containers..."
+docker compose up -d
 
 # Start FastAPI backend in background
 echo "🔧 Starting FastAPI backend..."
@@ -50,12 +65,14 @@ echo ""
 echo "🌟 ARC Review Analyzer is running!"
 echo "📱 Frontend: http://localhost:3000"
 echo "🔌 Backend API: http://localhost:8000"
+echo "🐳 Docker: containers running"
 echo ""
 echo "💡 Don't forget to:"
 echo "   1. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in frontend/.env.local"
 echo "   2. Ensure your HuggingFace token is in the root .env file"
 echo ""
-echo "Press Ctrl+C to stop both servers..."
+echo "Press Ctrl+C to stop servers and docker..."
+echo ""
 
 # Keep script running and wait for user interrupt
 wait

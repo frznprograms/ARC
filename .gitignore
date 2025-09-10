@@ -66,5 +66,5 @@ nosetests.xml
 coverage.xml
 
 data.csv
-
+**/dump.rdb
 extracted_labels/*

@@ -37,11 +37,10 @@ class InferencePipeline:
     """
 
     safety_model_path: str = "models/safety-model-test.pkl"
-    encoder_model_path: str = "lora_sft_encoder.pth"
     banned_ids_path: str = "redis_data/banned_ids.json"
     redis_port: int = 6379
     # need to modify this id
-    user_id = 69
+    user_id = 4269
 
     def __post_init__(self):
         """
@@ -72,16 +71,9 @@ class InferencePipeline:
         self.safety_model = joblib.load(self.safety_model_path)
         logger.success("Loaded safety model for Stage 1 checks.")
 
-        with suppress_stdout_stderr():
-            fasttext_model_path = snapshot_download(
-                repo_id="RunjiaChen/fasttext", token=hf_token
-            )
-            active_categories = ["ad", "irrelevant", "rant", "unsafe"]
-            self.fasttext_model = FasttextClassifier(
-                categories=active_categories, model_dir=Path(fasttext_model_path)
-            )
+        self._load_fasttext()
         logger.success("Loaded fasttext heads for Stage 2 checks.")
-
+        
         self.encoder = self._load_encoder()
         logger.success("Loaded encoder model for Stage 3 checks.")
 
@@ -152,6 +144,7 @@ class InferencePipeline:
             default_threshold=default_threshold,
             return_triggering_heads=True,
         )
+
         if label == "bad":
             logger.warning(
                 f"The review has been rejected by fasttext heads, where the fired heads are: {fired}."
@@ -199,6 +192,39 @@ class InferencePipeline:
                 f"Final prediction after 3 stages is {final_pred_accept} with probability {probs}."
             )
         return stage
+
+    @logger.catch(message="Unable to load FastText, reraise=True")
+    def _load_fasttext(self):
+        """
+        Load and initialize the FastText classifier for text categorization.
+
+        This method downloads a pre-trained FastText model from the Hugging Face 
+        repository and initializes a `FasttextClassifier` instance with a 
+        predefined set of categories. The standard output and error during model 
+        loading are suppressed to keep the logs clean.
+
+        The classifier is configured with the following categories:
+            - "ad"
+            - "irrelevant"
+            - "rant"
+            - "unsafe"
+
+        Attributes:
+            self.fasttext_model (FasttextClassifier): An instance of the FastText 
+                classifier initialized with the specified categories.
+
+        Raises:
+            Any exceptions raised during model download or initialization are 
+            automatically logged by the `logger.catch` decorator and re-raised.
+        """
+        with suppress_stdout_stderr():
+            fasttext_model_path = snapshot_download(
+                repo_id="RunjiaChen/fasttext", token=hf_token
+            )
+            active_categories = ["ad", "irrelevant", "rant", "unsafe"]
+            self.fasttext_model = FasttextClassifier(
+                categories=active_categories, model_dir=Path(fasttext_model_path)
+            )
 
     @logger.catch(message="Unable to load encoder.", reraise=True)
     def _load_encoder(self):
