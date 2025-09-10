@@ -360,7 +360,8 @@ export default function ReviewAnalyzer() {
                 <h2 className="text-lg font-semibold text-white mb-4">Final Result</h2>
                 {(() => {
                   const finalUpdate = stageUpdates[stageUpdates.length - 1];
-                  const allPassed = stageUpdates.filter(u => u.status === 'passed').length === 3;
+                  const passedCount = stageUpdates.slice(1).filter(u => u.status === 'passed').length;
+                  const allPassed = passedCount >= 2;
                   const bannedUpdate = stageUpdates.find(u => u.status === 'banned');
                   if (bannedUpdate) {
                     return (

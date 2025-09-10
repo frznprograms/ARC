@@ -8,6 +8,7 @@ from io import StringIO
 import json
 import re
 import asyncio
+import torch
 
 app = FastAPI()
 
@@ -79,27 +80,114 @@ async def get_stage_counters():
             "encoder_stage": 0
         }
 
+async def safety_stage(review_data):
+    # Stage 1: Safety check
+    pipeline.redis.incr("safety_stage")
+    review = review_data.get("review", None)
+    review = re.sub(r"\b(they|they're|them|up)\b", "", review, flags=re.IGNORECASE)  # type: ignore
+    # remove extra spaces
+    review = re.sub(r"\s+", " ", review).strip()
+
+    if review is None:
+        yield {'stage': 1, 'status': 'error', 'message': 'Review is empty'}
+        return
+
+    if isinstance(review, str):
+        review = [review]
+
+    safe_value = pipeline.safety_model.predict(review)
+    pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
+
+    if safe_value > 0:
+        pipeline.add_banned_ids(pipeline.user_id)
+        yield {'stage': 1, 'status': 'rejected', 'message': f'Review failed safety check (probability: {pred_strength[0]:.3f})'}
+        return
+    else:
+        yield {'stage': 1, 'status': 'passed', 'message': 'Safety check passed'}
+
+    await asyncio.sleep(0.2)
+
+async def fasttext_stage(review_data, prompt):
+        # Stage 2: Fasttext check
+        pipeline.redis.incr("fasttext_stage")
+        yield {'stage': 2, 'status': 'starting', 'message': 'Running fasttext classification...'}
+        await asyncio.sleep(0.1)
+        fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
+        thresholds = {"ad":0.7, "irrelevant":0.7, "rant": 0.7, "unsafe": 0.7}
+        for cat, prob in fasttext_results.items():
+            if cat == "ad" and prob < thresholds[cat]:
+                url_pattern = r'(?:https://[^\s]+|www\.[^\s]+|[^\s]+\.com(?:/[^\s]*)?)'
+                match = re.search(url_pattern, review_data["review"])
+                if match:
+                    prob = max(1, prob + 0.4)
+            # if any cat exceeds threshold, fail it
+            if prob > thresholds[cat]:
+                yield {'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {cat}'}
+                return
+
+        max_positive_confidence = max(fasttext_results.values())
+        early_accept_threshold = 0.3
+
+        if max_positive_confidence <= early_accept_threshold:
+            yield {'stage': 2, 'status': 'passed', 'message': f'Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3. Review accepted!'}
+            return
+        yield {'stage': 2, 'status': 'uncertain', 'message': 'Fasttext confidence within uncertain range'}
+        await asyncio.sleep(0.2)
+
+async def encoder_stage(prompt):
+    # stage 3 encoder check
+    pipeline.redis.incr("encoder_stage")
+    yield {'stage': 3, 'status': 'starting', 'message': 'Running encoder model...'}
+    await asyncio.sleep(0.1)
+
+    inputs = pipeline.tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        padding=True,
+        max_length=512,
+    )
+    
+
+    with torch.no_grad():
+        outputs = pipeline.encoder(**inputs)
+        probs = torch.sigmoid(outputs.logits)
+        preds = (probs > 0.5).int()
+
+    # Check if any prediction is positive (rejected)
+    has_positive_pred = torch.any(preds > 0).item()
+
+    # Get prediction scores for each bucket for console logging
+    scores = probs.squeeze().tolist()
+    bucket_names = ["ad", "irrelevant", "rant", "unsafe"]
+    score_details = {
+        bucket_names[i]: round(scores[i], 3) for i in range(len(scores))
+    }
+
+    if not has_positive_pred:
+        yield {'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details}
+    else:
+        # Find which labels triggered rejection
+        failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[i] > 0]
+        max_prob_idx = probs.argmax().item()
+        primary_label = bucket_names[max_prob_idx]
+        
+        if len(failed_labels) == 1:
+            reject_reason = f"'{primary_label}' (probability: {probs.max().item():.3f})"
+        else:
+            reject_reason = f"'{primary_label}' and {len(failed_labels)-1} other(s) (max probability: {probs.max().item():.3f})"
+        
+        yield {'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder for {reject_reason}', 'scores': score_details}
 
 @app.post("/analyze_review_stream/")
 async def analyze_review_stream(request: ReviewRequest):
+
+    review_data = request.review
     async def generate_stream():
         try:
-            yield f"data: {json.dumps({'stage': 1, 'status': 'starting', 'message': 'Starting safety check...'})}\n\n"
-            await asyncio.sleep(0.1)  # Small delay for UI
-
-            # Stage 1: Safety check
-            pipeline.redis.incr("safety_stage")
-            review_data = request.review
-            review = review_data.get("review", None)
-            review = re.sub(r"\b(they|they're|them|up)\b", "", review, flags=re.IGNORECASE)  # type: ignore
-            # remove extra spaces
-            review = re.sub(r"\s+", " ", review).strip()
-
-            if review is None:
-                yield f"data: {json.dumps({'stage': 1, 'status': 'error', 'message': 'Review is empty'})}\n\n"
-                return
+            # check if the id is in the banned list
             value = pipeline.redis.get(pipeline.user_id)
-             
+                
             if value:
                 value = value.decode("utf-8")  # convert bytes
                 if int(value) == -1:           # compare as integer
@@ -108,26 +196,16 @@ async def analyze_review_stream(request: ReviewRequest):
                     )
                     yield f"data: {json.dumps({'stage': 0, 'user_id': value, 'status': 'banned', 'message': 'This user has been flagged for reviews that did not pass our pipeline in the past'})}\n\n"
                     return   
-            if isinstance(review, str):
-                review = [review]
-
-            safe_value = pipeline.safety_model.predict(review)
-            pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
-
-            if safe_value > 0:
-                pipeline.add_banned_ids(pipeline.user_id)
-                yield f"data: {json.dumps({'stage': 1, 'status': 'rejected', 'message': f'Review failed safety check (probability: {pred_strength[0]:.3f})'})}\n\n"
-                return
-            else:
-                yield f"data: {json.dumps({'stage': 1, 'status': 'passed', 'message': 'Safety check passed'})}\n\n"
-
-            await asyncio.sleep(0.2)
-
-            # Stage 2: Fasttext check
-            pipeline.redis.incr("fasttext_stage")
-            yield f"data: {json.dumps({'stage': 2, 'status': 'starting', 'message': 'Running fasttext classification...'})}\n\n"
-            await asyncio.sleep(0.1)
-
+            yield f"data: {json.dumps({'stage': 1, 'status': 'starting', 'message': 'Starting safety check...'})}\n\n"
+            await asyncio.sleep(0.1)  # Small delay for UI
+    
+            # stage 1
+            async for message in safety_stage(review_data):
+                yield f"data: {json.dumps(message)}\n\n"
+                if message['status'] in {"error","rejected","banned"}:
+                    pipeline.add_banned_ids(value)
+                    return 
+                
             prompt = f"""
                 Business Name: {review_data["name"]}
                 Category: {review_data["category"]}
@@ -138,73 +216,21 @@ async def analyze_review_stream(request: ReviewRequest):
                 "\n", ""
             ).strip()
 
-            fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
-            thresholds = {"ad":0.9, "irrelevant":0.7, "rant": 0.7, "unsafe": 0.7}
-            for cat, prob in fasttext_results.items():
-                if cat == "ad" and prob < thresholds[cat]:
-                    url_pattern = r'(?:https://[^\s]+|www\.[^\s]+|[^\s]+\.com(?:/[^\s]*)?)'
-                    match = re.search(url_pattern, review_data["review"])
-                    if match:
-                        prob = max(1, prob + 0.4)
-                # if any cat exceeds threshold, fail it
-                if prob > thresholds[cat]:
-                    yield f"data: {json.dumps({'stage': 2, 'status': 'rejected', 'message': f'Review rejected by fasttext heads: {cat}'})}\n\n"
+            # stage 2
+            async for message in fasttext_stage(review_data,prompt):
+                yield f"data: {json.dumps(message)}\n\n"
+                if message['status'] in {"rejected"}:
+                    pipeline.add_banned_ids(value)
+                    return 
+                if message['status'] == "passed":
                     return
-
-            max_positive_confidence = max(fasttext_results.values())
-            early_accept_threshold = 0.3
-
-            if max_positive_confidence <= early_accept_threshold:
-                yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': f'Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3. Review accepted!'})}\n\n"
-                return
-            yield f"data: {json.dumps({'stage': 2, 'status': 'passed', 'message': 'Fasttext confidence within uncertain range'})}\n\n"
-            await asyncio.sleep(0.2)
-
+                
             # Stage 3: Encoder check
-            pipeline.redis.incr("encoder_stage")
-            yield f"data: {json.dumps({'stage': 3, 'status': 'starting', 'message': 'Running encoder model...'})}\n\n"
-            await asyncio.sleep(0.1)
-
-            inputs = pipeline.tokenizer(
-                prompt,
-                return_tensors="pt",
-                truncation=True,
-                padding=True,
-                max_length=512,
-            )
-
-            import torch
-
-            with torch.no_grad():
-                outputs = pipeline.encoder(**inputs)
-                probs = torch.sigmoid(outputs.logits)
-                preds = (probs > 0.5).int()
-
-            # Check if any prediction is positive (rejected)
-            has_positive_pred = torch.any(preds > 0).item()
-
-            # Get prediction scores for each bucket for console logging
-            scores = probs.squeeze().tolist()
-            bucket_names = ["ad", "irrelevant", "rant", "unsafe"]
-            score_details = {
-                bucket_names[i]: round(scores[i], 3) for i in range(len(scores))
-            }
-
-            if not has_positive_pred:
-                yield f"data: {json.dumps({'stage': 3, 'status': 'passed', 'message': 'Review passed all checks and was accepted!', 'scores': score_details})}\n\n"
-            else:
-                pipeline.add_banned_ids(pipeline.user_id)
-                # Find which labels triggered rejection
-                failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[i] > 0]
-                max_prob_idx = probs.argmax().item()
-                primary_label = bucket_names[max_prob_idx]
-                
-                if len(failed_labels) == 1:
-                    reject_reason = f"'{primary_label}' (probability: {probs.max().item():.3f})"
-                else:
-                    reject_reason = f"'{primary_label}' and {len(failed_labels)-1} other(s) (max probability: {probs.max().item():.3f})"
-                
-                yield f"data: {json.dumps({'stage': 3, 'status': 'rejected', 'message': f'Review rejected by encoder for {reject_reason}', 'scores': score_details})}\n\n"
+            async for message in encoder_stage(prompt):
+                yield f"data: {json.dumps(message)}\n\n"
+                if message['status'] in {"rejected"}:
+                    pipeline.add_banned_ids(value)
+                    return             
 
         except Exception as e:
             yield f"data: {json.dumps({'stage': -1, 'status': 'error', 'message': f'Pipeline error: {str(e)}'})}\n\n"
