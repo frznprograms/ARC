@@ -77,6 +77,159 @@ async def get_stage_counters():
             "safety_stage": 0,
             "fasttext_stage": 0,
             "encoder_stage": 0
+        return {"safety_stage": 0, "fasttext_stage": 0, "encoder_stage": 0}
+
+
+async def safety_stage(review_data):
+    # Stage 1: Safety check
+    pipeline.redis.incr("safety_stage")
+    review = review_data.get("review", None)
+    review = re.sub(r"\b(they|they're|them|up)\b", "", review, flags=re.IGNORECASE)  # type: ignore
+    # remove extra spaces
+    review = re.sub(r"\s+", " ", review).strip()
+
+    if review is None:
+        yield {"stage": 1, "status": "error", "message": "Review is empty"}
+        return
+
+    if isinstance(review, str):
+        review = [review]
+
+    safe_value = pipeline.safety_model.predict(review)
+    pred_strength = pipeline.safety_model.predict_proba(review)[:, 1]
+
+    if safe_value > 0:
+        pipeline.add_banned_ids(pipeline.user_id)
+        yield {
+            "stage": 1,
+            "status": "rejected",
+            "message": f"Review failed safety check (probability: {pred_strength[0]:.3f})",
+        }
+        return
+    else:
+        yield {"stage": 1, "status": "passed", "message": "Safety check passed"}
+
+    await asyncio.sleep(0.2)
+
+
+async def fasttext_stage(review_data, prompt):
+    # Stage 2: Fasttext check
+    pipeline.redis.incr("fasttext_stage")
+    yield {
+        "stage": 2,
+        "status": "starting",
+        "message": "Running fasttext classification...",
+    }
+    await asyncio.sleep(0.1)
+    fasttext_results = pipeline.fasttext_model.predict_all_heads(prompt)
+    thresholds = {"ad": 0.7, "irrelevant": 0.7, "rant": 0.7, "unsafe": 0.7}
+    for cat, prob in fasttext_results.items():
+        if cat == "ad" and prob < thresholds[cat]:
+            url_pattern = r"(?:https://[^\s]+|www\.[^\s]+|[^\s]+\.com(?:/[^\s]*)?)"
+            match = re.search(url_pattern, review_data["review"])
+            if match:
+                prob = max(1, prob + 0.4)
+        # if any cat exceeds threshold, fail it
+        if prob > thresholds[cat]:
+            yield {
+                "stage": 2,
+                "status": "rejected",
+                "message": f"Review rejected by fasttext heads: {cat}",
+            }
+            return
+
+    max_positive_confidence = max(fasttext_results.values())
+    early_accept_threshold = 0.25
+
+    if max_positive_confidence <= early_accept_threshold:
+        yield {
+            "stage": 2,
+            "status": "passed",
+            "message": f"Early acceptance triggered: max confidence {max_positive_confidence:.3f} <= {early_accept_threshold}, skipping Stage 3. Review accepted!",
+        }
+        return
+    yield {
+        "stage": 2,
+        "status": "uncertain",
+        "message": "Fasttext confidence within uncertain range",
+    }
+    await asyncio.sleep(0.2)
+
+
+async def encoder_stage(prompt):
+    # stage 3 encoder check
+    pipeline.redis.incr("encoder_stage")
+    yield {"stage": 3, "status": "starting", "message": "Running encoder model..."}
+    await asyncio.sleep(0.1)
+    
+    # Amplify LoRA scaling on first use (idempotent)
+    if not hasattr(pipeline.encoder, '_lora_amplified'):
+        amplification_factor = 4.0
+        
+        for name, module in pipeline.encoder.named_modules():
+            if hasattr(module, 'scaling') and any(x in name for x in ['q_lin', 'k_lin', 'v_lin']):
+                original_scaling = module.scaling
+                
+                if isinstance(original_scaling, dict):
+                    for adapter_name in original_scaling:
+                        original_value = original_scaling[adapter_name]
+                        module.scaling[adapter_name] = original_value * amplification_factor
+                elif isinstance(original_scaling, (int, float)):
+                    module.scaling = original_scaling * amplification_factor
+        
+        pipeline.encoder._lora_amplified = True
+
+    inputs = pipeline.tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        padding=True,
+        max_length=512,
+    )
+
+    with torch.no_grad():
+        outputs = pipeline.encoder(**inputs)
+        probs = torch.sigmoid(outputs.logits)
+        
+        # Class-specific thresholds based on validation metrics
+        thresholds = torch.tensor([0.2, 0.2, 0.2, 0.4])  # [ad, irrelevant, rant, toxicity]
+        preds = (probs > thresholds).int()
+    
+    has_positive_pred = torch.any(preds > 0).item()
+
+    # Get prediction scores for each bucket for console logging
+    scores = probs.squeeze().tolist()
+    bucket_names = ["ad", "irrelevant", "rant", "unsafe"]
+    score_details = {bucket_names[i]: round(scores[i], 3) for i in range(len(scores))}
+
+    if not has_positive_pred:
+        yield {
+            "stage": 3,
+            "status": "passed",
+            "message": "Review passed all checks and was accepted!",
+            "scores": score_details,
+        }
+    else:
+        # Find which labels triggered rejection with their thresholds
+        thresholds_list = [0.20, 0.15, 0.18, 0.4]  # [ad, irrelevant, rant, toxicity]
+        failed_labels = []
+        
+        for i in range(len(preds[0])):
+            if preds[0, i] > 0:
+                prob = probs[0, i].item()
+                threshold = thresholds_list[i]
+                failed_labels.append(f"{bucket_names[i]}({prob:.3f}>{threshold})")
+
+        if len(failed_labels) == 1:
+            reject_reason = failed_labels[0]
+        else:
+            reject_reason = f"{len(failed_labels)} categories: {', '.join(failed_labels)}"
+
+        yield {
+            "stage": 3,
+            "status": "rejected",
+            "message": f"Review rejected by encoder for {reject_reason}",
+            "scores": score_details,
         }
 
 

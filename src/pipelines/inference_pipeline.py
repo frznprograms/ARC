@@ -277,7 +277,7 @@ class InferencePipeline:
         count = self.redis.incr(key)
         
         # If counter reaches 3, set to -1
-        if count >= 3:
+        if count >= 100:
             self.redis.set(key, -1)
 
 if __name__ == "__main__":
