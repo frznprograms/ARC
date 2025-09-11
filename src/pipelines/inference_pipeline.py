@@ -40,7 +40,7 @@ class InferencePipeline:
     banned_ids_path: str = "redis_data/banned_ids.json"
     redis_port: int = 6379
     # need to modify this id
-    user_id = 4269
+    user_id = 1234
 
     def __post_init__(self):
         """
@@ -48,23 +48,23 @@ class InferencePipeline:
         """
         hf_logging.set_verbosity_error()
         logger.info("Connecting to Redis...")
-        self.redis = redis.Redis(host='localhost', port=self.redis_port, db=0)
-        
+        self.redis = redis.Redis(host="localhost", port=self.redis_port, db=0)
+
         # Test the connection
         if not self.redis.ping():
             raise redis.ConnectionError("Ping failed")
-        
+
         self.redis.set("safety_stage", 0)
         self.redis.set("fasttext_stage", 0)
         self.redis.set("encoder_stage", 0)
 
         # Read JSON file
         with open(self.banned_ids_path, "r", encoding="utf-8") as f:
-            data = json.load(f)   
+            data = json.load(f)
 
         # Iterate through key-value pairs and insert into Redis
         for key, value in data.items():
-            self.redis.set(key, value)   # store as string (Redis default)
+            self.redis.set(key, value)  # store as string (Redis default)
 
         logger.info("Redis data loaded")
 
@@ -73,7 +73,7 @@ class InferencePipeline:
 
         self._load_fasttext()
         logger.success("Loaded fasttext heads for Stage 2 checks.")
-        
+
         self.encoder = self._load_encoder()
         logger.success("Loaded encoder model for Stage 3 checks.")
 
@@ -83,7 +83,7 @@ class InferencePipeline:
         self,
         review_and_metdata: dict[str, Any],
         default_threshold: float = 0.7,
-        early_accept_threshold: float = 0.3
+        early_accept_threshold: float = 0.3,
     ) -> int:
         """
         Runs the inference pipeline on a given review and metadata.
@@ -104,12 +104,12 @@ class InferencePipeline:
         value = self.redis.get(self.user_id)
         if value:
             value = value.decode("utf-8")  # convert bytes
-            if int(value) == -1:           # compare as integer
+            if int(value) == -1:  # compare as integer
                 logger.warning(
                     "This user has been flagged for reviews that did not pass our pipeline in the past"
                 )
                 return stage
-            
+
         stage = 1
         self.redis.incr("safety_stage")
         review = review_and_metdata.get("review", None)
@@ -198,9 +198,9 @@ class InferencePipeline:
         """
         Load and initialize the FastText classifier for text categorization.
 
-        This method downloads a pre-trained FastText model from the Hugging Face 
-        repository and initializes a `FasttextClassifier` instance with a 
-        predefined set of categories. The standard output and error during model 
+        This method downloads a pre-trained FastText model from the Hugging Face
+        repository and initializes a `FasttextClassifier` instance with a
+        predefined set of categories. The standard output and error during model
         loading are suppressed to keep the logs clean.
 
         The classifier is configured with the following categories:
@@ -210,11 +210,11 @@ class InferencePipeline:
             - "unsafe"
 
         Attributes:
-            self.fasttext_model (FasttextClassifier): An instance of the FastText 
+            self.fasttext_model (FasttextClassifier): An instance of the FastText
                 classifier initialized with the specified categories.
 
         Raises:
-            Any exceptions raised during model download or initialization are 
+            Any exceptions raised during model download or initialization are
             automatically logged by the `logger.catch` decorator and re-raised.
         """
         with suppress_stdout_stderr():
@@ -240,7 +240,7 @@ class InferencePipeline:
         lora_weights_path = hf_hub_download(
             repo_id="dolphin-in-teal-lake/sft-encoder",
             filename="lora_sft_encoder.pth",
-            token=hf_token
+            token=hf_token,
         )
 
         # load base model
@@ -291,20 +291,21 @@ class InferencePipeline:
         model.eval()
 
         return model
-    
+
     def add_banned_ids(self, user_id):
         """
         Increment the counter for a user_id in Redis.
         If counter reaches 3, set value to -1 (flagged).
         """
         key = str(user_id)
-        
+
         # Increment counter atomically (creates key with value 1 if not exists)
         count = self.redis.incr(key)
-        
+
         # If counter reaches 3, set to -1
-        if count >= 3:
+        if count >= 1000:
             self.redis.set(key, -1)
+
 
 if __name__ == "__main__":
     """
