@@ -1,6 +1,9 @@
 ![architecture](assets/archi.png)
 <h1 style="text-align: center;">ARC - Automated Review Checking with Machine Learning</h1>
-by Rudy's Rangers, for TikTok TechJam 2025 *FINALS*
+by Rudy's Rangers, for TikTok TechJam 2025 
+
+We are proud and grateful to the team at TikTok for granting us **5th place** out of over 300 teams at the TikTok TechJam 2025 for our achievements and innovation in this project.
+
 <h3 style="text-align: center;">Chosen Problem Statment: Filtering the Noise: ML for Trustworthy Location Reviews</h2>
 
 ### Authors

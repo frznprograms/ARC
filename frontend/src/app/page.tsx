@@ -15,8 +15,14 @@ interface ReviewData {
 
 interface StageUpdate {
   stage: number;
-  status: 'starting' | 'passed' | 'rejected' | 'error' | 'banned';
+  status: 'starting' | 'passed' | 'rejected' | 'error' | 'banned' | 'uncertain';
   message: string;
+  scores?: {
+    ad: number;
+    irrelevant: number;
+    rant: number;
+    unsafe: number;
+  };
 }
 
 interface MapLocation {
@@ -121,13 +127,27 @@ export default function ReviewAnalyzer() {
               const update: StageUpdate = {
                 stage: data.stage,
                 status: data.status,
-                message: data.message
+                message: data.message,
+                scores: data.scores
               };
               
               setStageUpdates(prev => [...prev, update]);
               setCurrentStage(data.stage);
+              
+              // Enhanced logging for threshold tuning
               if (data.scores) {
-                console.log('Encoder scores:', data.scores);
+                console.log('=== ENCODER PROBABILITIES FOR THRESHOLD TUNING ===');
+                console.log('Review:', reviewData.review.slice(0, 100) + '...');
+                console.log('Probabilities:', data.scores);
+                
+                const thresholds = { ad: 0.3, irrelevant: 0.25, rant: 0.2, unsafe: 0.4 };
+                const triggered = Object.entries(data.scores).filter(([key, prob]) => 
+                  prob > thresholds[key as keyof typeof thresholds]
+                );
+                
+                console.log('Triggered categories:', triggered.length > 0 ? triggered : 'None');
+                console.log('Result:', data.status);
+                console.log('===========================================');
               }
             } catch (parseError) {
               console.error('Error parsing SSE data:', parseError);

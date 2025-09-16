@@ -299,10 +299,8 @@ class InferencePipeline:
         """
         key = str(user_id)
 
-        # Increment counter atomically (creates key with value 1 if not exists)
         count = self.redis.incr(key)
 
-        # If counter reaches 3, set to -1
         if count >= 1000:
             self.redis.set(key, -1)
 

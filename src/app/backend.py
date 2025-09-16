@@ -76,7 +76,10 @@ async def get_stage_counters():
             "encoder_stage": int(encoder_count.decode("utf-8")) if encoder_count else 0,
         }
     except Exception as e:
-        return {"safety_stage": 0, "fasttext_stage": 0, "encoder_stage": 0}
+        return {
+            "safety_stage": 0,
+            "fasttext_stage": 0,
+            "encoder_stage": 0
 
 
 async def safety_stage(review_data):
@@ -160,6 +163,22 @@ async def encoder_stage(prompt):
     pipeline.redis.incr("encoder_stage")
     yield {"stage": 3, "status": "starting", "message": "Running encoder model..."}
     await asyncio.sleep(0.1)
+    
+    if not hasattr(pipeline.encoder, '_lora_amplified'):
+        amplification_factor = 4.0
+        
+        for name, module in pipeline.encoder.named_modules():
+            if hasattr(module, 'scaling') and any(x in name for x in ['q_lin', 'k_lin', 'v_lin']):
+                original_scaling = module.scaling
+                
+                if isinstance(original_scaling, dict):
+                    for adapter_name in original_scaling:
+                        original_value = original_scaling[adapter_name]
+                        module.scaling[adapter_name] = original_value * amplification_factor
+                elif isinstance(original_scaling, (int, float)):
+                    module.scaling = original_scaling * amplification_factor
+        
+        pipeline.encoder._lora_amplified = True
 
     inputs = pipeline.tokenizer(
         prompt,
@@ -172,11 +191,10 @@ async def encoder_stage(prompt):
     with torch.no_grad():
         outputs = pipeline.encoder(**inputs)
         probs = torch.sigmoid(outputs.logits)
-        preds = (probs > 0.5).int()
+        thresholds = torch.tensor([0.2, 0.2, 0.2, 0.4])  # [ad, irrelevant, rant, toxicity]
+        preds = (probs > thresholds).int()
 
-    # Check if any prediction is positive (rejected)
     has_positive_pred = torch.any(preds > 0).item()
-
     # Get prediction scores for each bucket for console logging
     scores = probs.squeeze().tolist()
     bucket_names = ["ad", "irrelevant", "rant", "unsafe"]
@@ -190,15 +208,19 @@ async def encoder_stage(prompt):
             "scores": score_details,
         }
     else:
-        # Find which labels triggered rejection
-        failed_labels = [bucket_names[i] for i in range(len(preds)) if preds[0, i] > 0]
-        max_prob_idx = probs.argmax().item()
-        primary_label = bucket_names[max_prob_idx]
+        # Find which labels triggered rejection with their thresholds
+        thresholds_list = [0.2, 0.2, 0.2, 0.4]  # [ad, irrelevant, rant, toxicity]
+        failed_labels = []
+        for i in range(len(preds[0])):
+            if preds[0, i] > 0:
+                prob = probs[0, i].item()
+                threshold = thresholds_list[i]
+                failed_labels.append(f"{bucket_names[i]}({prob:.3f}>{threshold})")
 
         if len(failed_labels) == 1:
-            reject_reason = f"'{primary_label}' (probability: {probs.max().item():.3f})"
+            reject_reason = failed_labels[0]
         else:
-            reject_reason = f"'{primary_label}' and {len(failed_labels)-1} other(s) (max probability: {probs.max().item():.3f})"
+            reject_reason = f"{len(failed_labels)} categories: {', '.join(failed_labels)}"
 
         yield {
             "stage": 3,
