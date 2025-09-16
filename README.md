@@ -1,3 +1,4 @@
+![architecture](assets/archi.png)
 <h1 style="text-align: center;">ARC - Automated Review Checking with Machine Learning</h1>
 by Rudy's Rangers, for TikTok TechJam 2025 *FINALS*
 <h3 style="text-align: center;">Chosen Problem Statment: Filtering the Noise: ML for Trustworthy Location Reviews</h2>
